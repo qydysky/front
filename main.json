@@ -6,8 +6,10 @@
             "path": "/",
             "back": [
                 {
+                    "name": "test",
                     "to": "http://127.0.0.1:13000",
                     "weight": 1,
+                    "pathAdd": false,
                     "resHeader":[
                         {
                             "action": "set",

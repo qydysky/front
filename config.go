@@ -36,8 +36,10 @@ func (t *Route) GenBack() []*Back {
 	var backLink []*Back
 	for _, back := range t.Back {
 		tmpBack := Back{
+			Name:      back.Name,
 			To:        back.To,
 			Weight:    back.Weight,
+			PathAdd:   back.PathAdd,
 			ReqHeader: append([]Header{}, back.ReqHeader...),
 			ResHeader: append([]Header{}, back.ResHeader...),
 		}
@@ -49,8 +51,10 @@ func (t *Route) GenBack() []*Back {
 }
 
 type Back struct {
+	Name      string   `json:"name"`
 	To        string   `json:"to"`
 	Weight    int      `json:"weight"`
+	PathAdd   bool     `json:"pathAdd"`
 	ReqHeader []Header `json:"reqHeader"`
 	ResHeader []Header `json:"resHeader"`
 }

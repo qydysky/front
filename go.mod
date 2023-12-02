@@ -6,6 +6,7 @@ require (
 	github.com/andybalholm/brotli v1.0.6 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
+	github.com/gorilla/websocket v1.5.1
 	github.com/klauspost/compress v1.17.3 // indirect
 	github.com/miekg/dns v1.1.57 // indirect
 	github.com/qydysky/part v0.28.20231202144738 // indirect
