@@ -1,0 +1,22 @@
+{
+    "addr":"0.0.0.0:9009",
+    "matchRule": "prefix",
+    "routes":[
+        {
+            "path": "/",
+            "back": [
+                {
+                    "to": "http://127.0.0.1:13000",
+                    "weight": 1,
+                    "resHeader":[
+                        {
+                            "action": "set",
+                            "key": "KEY",
+                            "value": "asf"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
