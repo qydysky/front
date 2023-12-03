@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 )
 
 type Config struct {
@@ -39,6 +40,7 @@ func (t *Route) GenBack() []*Back {
 			Name:      back.Name,
 			To:        back.To,
 			Weight:    back.Weight,
+			ErrBanSec: back.ErrBanSec,
 			PathAdd:   back.PathAdd,
 			ReqHeader: append([]Header{}, back.ReqHeader...),
 			ResHeader: append([]Header{}, back.ResHeader...),
@@ -51,12 +53,27 @@ func (t *Route) GenBack() []*Back {
 }
 
 type Back struct {
+	lock      sync.RWMutex
+	upT       time.Time
 	Name      string   `json:"name"`
 	To        string   `json:"to"`
 	Weight    int      `json:"weight"`
+	ErrBanSec int      `json:"errBanSec"`
 	PathAdd   bool     `json:"pathAdd"`
 	ReqHeader []Header `json:"reqHeader"`
 	ResHeader []Header `json:"resHeader"`
+}
+
+func (t *Back) IsLive() bool {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.upT.Before(time.Now())
+}
+
+func (t *Back) Disable() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.upT = time.Now().Add(time.Second * time.Duration(t.ErrBanSec))
 }
 
 type Header struct {
