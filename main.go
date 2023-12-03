@@ -76,7 +76,7 @@ func Run(ctx context.Context, configSP *Config, logger *plog.Log_interface) {
 	routeP := pweb.WebPath{}
 
 	logger.L(`I:`, "启动...")
-	defer logger.L(`I:`, "退出...")
+	defer logger.L(`I:`, "退出,等待1min连接关闭...")
 
 	// config对象初次加载
 	if e := applyConfig(ctx, configSP, &routeP, logger); e != nil {
@@ -330,7 +330,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 			fin := make(chan error)
 			reqc := req.NetConn()
 			resc := res.NetConn()
-			ctx, cancle := pctx.WithWait(ctx, 2, time.Minute)
+			ctx, cancle := pctx.WithWait(ctx, 2, time.Second*30)
 			defer func() {
 				if errors.Is(cancle(), pctx.ErrWaitTo) {
 					logger.L(`E:`, "退出超时")
