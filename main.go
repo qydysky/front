@@ -327,15 +327,13 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 			logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
 			return ErrResDoFail
 		} else {
+			ctx, cancle := pctx.WithWait(ctx, 2, time.Second*45)
+			defer func() {
+				_ = cancle()
+			}()
 			fin := make(chan error)
 			reqc := req.NetConn()
 			resc := res.NetConn()
-			ctx, cancle := pctx.WithWait(ctx, 2, time.Second*30)
-			defer func() {
-				if errors.Is(cancle(), pctx.ErrWaitTo) {
-					logger.L(`E:`, "退出超时")
-				}
-			}()
 			go func() {
 				ctx1, done1 := pctx.WaitCtx(ctx)
 				defer done1()
