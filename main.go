@@ -188,7 +188,7 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 				e = httpDealer(ctx1, w, r, path, backArray[backI], logger)
 			}
 			if e != nil && backArray[backI].IsLive() {
-				logger.L(`W:`, fmt.Sprintf("%s=>%s 后端失效", path, backArray[backI].Name))
+				logger.L(`W:`, fmt.Sprintf("%s=>%s %v", path, backArray[backI].Name, e))
 				backArray[backI].Disable()
 			}
 		})
