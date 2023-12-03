@@ -187,7 +187,7 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 			} else {
 				e = httpDealer(ctx1, w, r, path, backArray[backI], logger)
 			}
-			if e != nil {
+			if e != nil && backArray[backI].IsLive() {
 				logger.L(`W:`, fmt.Sprintf("%s=>%s 后端失效", path, backArray[backI].Name))
 				backArray[backI].Disable()
 			}
@@ -344,11 +344,13 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 			}()
 			select {
 			case e := <-fin:
-				logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
-				return ErrCopy
+				if e != nil {
+					logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
+					return ErrCopy
+				}
 			case <-ctx.Done():
-				return nil
 			}
+			return nil
 		}
 	}
 }
