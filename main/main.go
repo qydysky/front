@@ -1,0 +1,77 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"os"
+	"os/signal"
+	"slices"
+	"time"
+
+	pfront "github.com/qydysky/front"
+	pctx "github.com/qydysky/part/ctx"
+	pfile "github.com/qydysky/part/file"
+	plog "github.com/qydysky/part/log"
+	psys "github.com/qydysky/part/sys"
+)
+
+func main() {
+	// 保持唤醒
+	var stop = psys.Sys().PreventSleep()
+	defer stop.Done()
+
+	// 获取config路径
+	configP := flag.String("c", "main.json", "config")
+	testP := flag.Int("t", 0, "test port")
+	_ = flag.Bool("q", true, "no warn,error log")
+	flag.Parse()
+
+	// 日志初始化
+	logger := plog.New(plog.Config{
+		Stdout: true,
+		Prefix_string: map[string]struct{}{
+			`T:`: plog.On,
+			`I:`: plog.On,
+			`W:`: plog.On,
+			`E:`: plog.On,
+		},
+	})
+
+	if slices.Contains(os.Args[1:], "-q") {
+		logger.L(`I:`, "简化输出")
+		delete(logger.Config.Prefix_string, `E:`)
+		delete(logger.Config.Prefix_string, `W:`)
+		delete(logger.Config.Prefix_string, `T:`)
+	}
+
+	// 根ctx
+	ctx, cancle := pctx.WithWait(context.Background(), 0, time.Minute*2)
+
+	// 获取config
+	configS := pfront.Config{}
+	configF := pfile.New(*configP, 0, true)
+	if !configF.IsExist() {
+		logger.L(`E:`, "配置不存在")
+		return
+	}
+	defer configF.Close()
+
+	var buf = make([]byte, 1<<16)
+
+	// 加载配置
+	pfront.LoadPeriod(ctx, buf, configF, &configS, logger)
+
+	// 测试响应
+	go pfront.Test(ctx, *testP, logger)
+
+	go pfront.Run(ctx, &configS, logger)
+
+	// ctrl+c退出
+	var interrupt = make(chan os.Signal, 2)
+	signal.Notify(interrupt, os.Interrupt)
+	<-interrupt
+	if errors.Is(cancle(), pctx.ErrWaitTo) {
+		logger.L(`E:`, "退出超时")
+	}
+}

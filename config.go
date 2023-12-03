@@ -35,7 +35,8 @@ func (t *Route) SwapSign() bool {
 
 func (t *Route) GenBack() []*Back {
 	var backLink []*Back
-	for _, back := range t.Back {
+	for i := 0; i < len(t.Back); i++ {
+		back := &t.Back[i]
 		tmpBack := Back{
 			Name:      back.Name,
 			To:        back.To,
