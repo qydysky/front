@@ -330,25 +330,37 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 			fin := make(chan error)
 			reqc := req.NetConn()
 			resc := res.NetConn()
+			ctx, cancle := pctx.WithWait(ctx, 2, time.Minute)
 			defer func() {
+				if errors.Is(cancle(), pctx.ErrWaitTo) {
+					logger.L(`E:`, "退出超时")
+				}
+			}()
+			go func() {
+				ctx1, done1 := pctx.WaitCtx(ctx)
+				defer done1()
+				_, e := io.Copy(reqc, resc)
+				select {
+				case fin <- e:
+				case <-ctx1.Done():
+					fin <- nil
+				}
 				reqc.Close()
+			}()
+			go func() {
+				ctx1, done1 := pctx.WaitCtx(ctx)
+				defer done1()
+				_, e := io.Copy(resc, reqc)
+				select {
+				case fin <- e:
+				case <-ctx1.Done():
+					fin <- nil
+				}
 				resc.Close()
 			}()
-			go func() {
-				_, e := io.Copy(reqc, resc)
-				fin <- e
-			}()
-			go func() {
-				_, e := io.Copy(resc, reqc)
-				fin <- e
-			}()
-			select {
-			case e := <-fin:
-				if e != nil {
-					logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
-					return ErrCopy
-				}
-			case <-ctx.Done():
+			if e := <-fin; e != nil {
+				logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
+				return ErrCopy
 			}
 			return nil
 		}
