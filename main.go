@@ -97,9 +97,11 @@ func Run(ctx context.Context, configSP *Config, logger *plog.Log_interface) {
 		return
 	}
 
-	syncWeb := pweb.NewSyncMap(&http.Server{
+	httpSer := http.Server{
 		Addr: configSP.Addr,
-	}, &routeP, matchfunc)
+	}
+
+	syncWeb := pweb.NewSyncMap(&httpSer, &routeP, matchfunc)
 	defer syncWeb.Shutdown()
 
 	// 定时加载config
@@ -138,6 +140,7 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 	for i := 0; i < len(configS.Routes); i++ {
 		route := &configS.Routes[i]
 		path := route.Path
+		ErrRedirect := route.ErrRedirect
 
 		if !route.SwapSign() {
 			continue
@@ -187,9 +190,13 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 			} else {
 				e = httpDealer(ctx1, w, r, path, backArray[backI], logger)
 			}
-			if e != nil && backArray[backI].IsLive() {
+			if e != nil {
 				logger.L(`W:`, fmt.Sprintf("%s=>%s %v", path, backArray[backI].Name, e))
 				backArray[backI].Disable()
+				if !errors.Is(e, ErrCopy) && ErrRedirect {
+					w.Header().Set("Location", r.URL.String())
+					w.WriteHeader(http.StatusTemporaryRedirect)
+				}
 			}
 		})
 	}
@@ -197,12 +204,13 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 }
 
 var (
-	ErrNoHttp     = errors.New("ErrNoHttp")
-	ErrNoWs       = errors.New("ErrNoWs")
-	ErrCopy       = errors.New("ErrCopy")
-	ErrReqCreFail = errors.New("ErrReqCreFail")
-	ErrReqDoFail  = errors.New("ErrReqDoFail")
-	ErrResDoFail  = errors.New("ErrResDoFail")
+	ErrNoHttp          = errors.New("ErrNoHttp")
+	ErrNoWs            = errors.New("ErrNoWs")
+	ErrCopy            = errors.New("ErrCopy")
+	ErrReqCreFail      = errors.New("ErrReqCreFail")
+	ErrReqDoFail       = errors.New("ErrReqDoFail")
+	ErrResDoFail       = errors.New("ErrResDoFail")
+	ErrHeaderCheckFail = errors.New("ErrHeaderCheckFail")
 )
 
 func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, back *Back, logger *plog.Log_interface) error {
@@ -212,15 +220,11 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 	}
 
 	if !strings.HasPrefix(url, "http") {
-		pweb.WithStatusCode(w, http.StatusServiceUnavailable)
-		logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, "非http"))
 		return ErrNoHttp
 	}
 
 	req, e := http.NewRequestWithContext(ctx, r.Method, url, r.Body)
 	if e != nil {
-		pweb.WithStatusCode(w, http.StatusServiceUnavailable)
-		logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
 		return ErrReqCreFail
 	}
 
@@ -230,6 +234,10 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 	for _, v := range back.ReqHeader {
 		switch v.Action {
+		case `check`:
+			if req.Header.Get(v.Key) != v.Value {
+				return ErrHeaderCheckFail
+			}
 		case `set`:
 			req.Header.Set(v.Key, v.Value)
 		case `add`:
@@ -243,8 +251,6 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 	client := http.Client{}
 	resp, e := client.Do(req)
 	if e != nil {
-		pweb.WithStatusCode(w, http.StatusServiceUnavailable)
-		logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
 		return ErrReqDoFail
 	}
 
@@ -254,6 +260,10 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 	for _, v := range back.ResHeader {
 		switch v.Action {
+		case `check`:
+			if resp.Header.Get(v.Key) != v.Value {
+				return ErrHeaderCheckFail
+			}
 		case `set`:
 			w.Header().Set(v.Key, v.Value)
 		case `add`:
@@ -286,14 +296,16 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 	}
 
 	if !strings.HasPrefix(url, "ws") {
-		pweb.WithStatusCode(w, http.StatusServiceUnavailable)
-		logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, "非websocket"))
 		return ErrNoWs
 	}
 
 	reqHeader := make(http.Header)
 	for _, v := range back.ReqHeader {
 		switch v.Action {
+		case `check`:
+			if r.Header.Get(v.Key) != v.Value {
+				return ErrHeaderCheckFail
+			}
 		case `set`:
 			reqHeader.Set(v.Key, v.Value)
 		case `add`:
@@ -305,12 +317,14 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		}
 	}
 	if res, resp, e := websocket.DefaultDialer.Dial(url, reqHeader); e != nil {
-		pweb.WithStatusCode(w, http.StatusServiceUnavailable)
-		logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
 		return ErrReqDoFail
 	} else {
 		for _, v := range back.ResHeader {
 			switch v.Action {
+			case `check`:
+				if resp.Header.Get(v.Key) != v.Value {
+					return ErrHeaderCheckFail
+				}
 			case `set`:
 				resp.Header.Set(v.Key, v.Value)
 			case `add`:
@@ -323,8 +337,6 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		}
 
 		if req, e := (&websocket.Upgrader{}).Upgrade(w, r, resp.Header); e != nil {
-			pweb.WithStatusCode(w, http.StatusServiceUnavailable)
-			logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
 			return ErrResDoFail
 		} else {
 			ctx, cancle := pctx.WithWait(ctx, 2, time.Second*45)

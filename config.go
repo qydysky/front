@@ -9,16 +9,21 @@ import (
 )
 
 type Config struct {
-	lock      sync.RWMutex
-	Addr      string  `json:"addr"`
+	lock sync.RWMutex
+	Addr string `json:"addr"`
+	TLS  struct {
+		Pub string `json:"pub"`
+		Key string `json:"key"`
+	} `json:"tls"`
 	MatchRule string  `json:"matchRule"`
 	Routes    []Route `json:"routes"`
 }
 
 type Route struct {
-	Path string `json:"path"`
-	Sign string `json:"-"`
-	Back []Back `json:"back"`
+	Path        string `json:"path"`
+	Sign        string `json:"-"`
+	ErrRedirect bool   `json:"errRedirect"`
+	Back        []Back `json:"back"`
 }
 
 func (t *Route) SwapSign() bool {
