@@ -2,6 +2,7 @@ package front
 
 import (
 	"crypto/md5"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -12,8 +13,9 @@ type Config struct {
 	lock sync.RWMutex
 	Addr string `json:"addr"`
 	TLS  struct {
-		Pub string `json:"pub"`
-		Key string `json:"key"`
+		Config *tls.Config `json:"-"`
+		Pub    string      `json:"pub"`
+		Key    string      `json:"key"`
 	} `json:"tls"`
 	MatchRule string  `json:"matchRule"`
 	Routes    []Route `json:"routes"`

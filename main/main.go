@@ -24,7 +24,7 @@ func main() {
 	// 获取config路径
 	configP := flag.String("c", "main.json", "config")
 	testP := flag.Int("t", 0, "test port")
-	_ = flag.Bool("q", true, "no warn,error log")
+	_ = flag.Bool("q", false, "no warn,error log")
 	flag.Parse()
 
 	// 日志初始化
@@ -60,12 +60,14 @@ func main() {
 	var buf = make([]byte, 1<<16)
 
 	// 加载配置
-	pfront.LoadPeriod(ctx, buf, configF, &configS, logger)
+	if e := pfront.LoadPeriod(ctx, buf, configF, &configS, logger); e != nil {
+		return
+	}
 
 	// 测试响应
-	go pfront.Test(ctx, *testP, logger)
+	go pfront.Test(ctx, *testP, logger.Base("测试"))
 
-	go pfront.Run(ctx, &configS, logger)
+	go pfront.Run(ctx, &configS, logger.Base("转发"))
 
 	// ctrl+c退出
 	var interrupt = make(chan os.Signal, 2)

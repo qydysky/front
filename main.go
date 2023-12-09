@@ -2,6 +2,7 @@ package front
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,15 +13,25 @@ import (
 
 	"github.com/gorilla/websocket"
 	pctx "github.com/qydysky/part/ctx"
-	pfile "github.com/qydysky/part/file"
-	plog "github.com/qydysky/part/log"
 	pweb "github.com/qydysky/part/web"
 )
 
+type Logger interface {
+	Error(msg string, args ...any)
+	Debug(msg string, args ...any)
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+}
+
+type File interface {
+	Read(data []byte) (int, error)
+}
+
 // 加载
-func LoadPeriod(ctx context.Context, buf []byte, configF *pfile.File, configS *Config, logger *plog.Log_interface) {
-	if e := loadConfig(buf, configF, configS, logger); e != nil {
-		logger.L(`E:`, "配置加载", e)
+func LoadPeriod(ctx context.Context, buf []byte, configF File, configS *Config, logger Logger) error {
+	if e := loadConfig(buf, configF, configS); e != nil {
+		logger.Error(`E:`, "配置加载", e)
+		return e
 	}
 	// 定时加载config
 	go func() {
@@ -29,25 +40,25 @@ func LoadPeriod(ctx context.Context, buf []byte, configF *pfile.File, configS *C
 		for {
 			select {
 			case <-time.After(time.Second * 10):
-				if e := loadConfig(buf, configF, configS, logger); e != nil {
-					logger.L(`E:`, "配置加载", e)
+				if e := loadConfig(buf, configF, configS); e != nil {
+					logger.Error(`E:`, "配置加载", e)
 				}
 			case <-ctx1.Done():
 				return
 			}
 		}
 	}()
+	return nil
 }
 
 // 测试
-func Test(ctx context.Context, port int, logger *plog.Log_interface) {
+func Test(ctx context.Context, port int, logger Logger) {
 	if port == 0 {
 		return
 	}
-	logger = logger.Base("测试")
 	ctx1, done1 := pctx.WaitCtx(ctx)
 	defer done1()
-	logger.L(`I:`, "启动", fmt.Sprintf("127.0.0.1:%d", port))
+	logger.Info(`I:`, "启动", fmt.Sprintf("127.0.0.1:%d", port))
 	s := pweb.New(&http.Server{
 		Addr:         fmt.Sprintf("127.0.0.1:%d", port),
 		WriteTimeout: time.Second * time.Duration(10),
@@ -62,21 +73,20 @@ func Test(ctx context.Context, port int, logger *plog.Log_interface) {
 }
 
 // 转发
-func Run(ctx context.Context, configSP *Config, logger *plog.Log_interface) {
-	logger = logger.Base("转发")
+func Run(ctx context.Context, configSP *Config, logger Logger) {
 	// 根ctx
 	ctx, cancle := pctx.WithWait(ctx, 0, time.Minute)
 	defer func() {
 		if errors.Is(cancle(), pctx.ErrWaitTo) {
-			logger.L(`E:`, "退出超时")
+			logger.Error(`E:`, "退出超时")
 		}
 	}()
 
 	// 路由
 	routeP := pweb.WebPath{}
 
-	logger.L(`I:`, "启动...")
-	defer logger.L(`I:`, "退出,等待1min连接关闭...")
+	logger.Info(`I:`, "启动...")
+	defer logger.Info(`I:`, "退出,等待1min连接关闭...")
 
 	// config对象初次加载
 	if e := applyConfig(ctx, configSP, &routeP, logger); e != nil {
@@ -87,18 +97,22 @@ func Run(ctx context.Context, configSP *Config, logger *plog.Log_interface) {
 	var matchfunc func(path string) (func(w http.ResponseWriter, r *http.Request), bool)
 	switch configSP.MatchRule {
 	case "prefix":
-		logger.L(`I:`, "匹配规则", "prefix")
+		logger.Info(`I:`, "匹配规则", "prefix")
 		matchfunc = routeP.LoadPerfix
 	case "all":
-		logger.L(`I:`, "匹配规则", "all")
+		logger.Info(`I:`, "匹配规则", "all")
 		matchfunc = routeP.Load
 	default:
-		logger.L(`E:`, "匹配规则", "无效")
+		logger.Error(`E:`, "匹配规则", "无效")
 		return
 	}
 
 	httpSer := http.Server{
 		Addr: configSP.Addr,
+	}
+
+	if configSP.TLS.Config != nil {
+		httpSer.TLSConfig = configSP.TLS.Config.Clone()
 	}
 
 	syncWeb := pweb.NewSyncMap(&httpSer, &routeP, matchfunc)
@@ -115,25 +129,33 @@ func Run(ctx context.Context, configSP *Config, logger *plog.Log_interface) {
 	}
 }
 
-func loadConfig(buf []byte, configF *pfile.File, configS *Config, logger *plog.Log_interface) error {
+func loadConfig(buf []byte, configF File, configS *Config) error {
 	if i, e := configF.Read(buf); e != nil && !errors.Is(e, io.EOF) {
-		logger.L(`E:`, `读取配置`, e)
 		return e
 	} else if i == cap(buf) {
-		logger.L(`E:`, `读取配置`, `buf full`)
 		return errors.New(`buf full`)
 	} else {
 		configS.lock.Lock()
 		defer configS.lock.Unlock()
 		if e := json.Unmarshal(buf[:i], configS); e != nil {
-			logger.L(`E:`, `读取配置`, e)
 			return e
+		}
+
+		if configS.TLS.Key != "" && configS.TLS.Pub != "" {
+			if cert, e := tls.LoadX509KeyPair(configS.TLS.Pub, configS.TLS.Key); e != nil {
+				return e
+			} else {
+				configS.TLS.Config = &tls.Config{
+					Certificates: []tls.Certificate{cert},
+					NextProtos:   []string{"h2", "http/1.1"},
+				}
+			}
 		}
 	}
 	return nil
 }
 
-func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, logger *plog.Log_interface) error {
+func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, logger Logger) error {
 	configS.lock.RLock()
 	defer configS.lock.RUnlock()
 
@@ -147,7 +169,7 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 		}
 
 		if len(route.Back) == 0 {
-			logger.L(`I:`, "移除路由", path)
+			logger.Info(`I:`, "移除路由", path)
 			routeP.Store(path, nil)
 			continue
 		}
@@ -155,12 +177,12 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 		backArray := route.GenBack()
 
 		if len(backArray) == 0 {
-			logger.L(`I:`, "移除路由", path)
+			logger.Info(`I:`, "移除路由", path)
 			routeP.Store(path, nil)
 			continue
 		}
 
-		logger.L(`I:`, "路由更新", path)
+		logger.Info(`I:`, "路由更新", path)
 
 		routeP.Store(path, func(w http.ResponseWriter, r *http.Request) {
 			ctx1, done1 := pctx.WaitCtx(ctx)
@@ -176,13 +198,13 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 					}
 				}
 				if backI == int64(len(backArray)) {
-					pweb.WithStatusCode(w, http.StatusServiceUnavailable)
-					logger.L(`E:`, fmt.Sprintf("%s=> 全部后端失效", path))
+					w.WriteHeader(http.StatusServiceUnavailable)
+					logger.Error(`E:`, fmt.Sprintf("%s=> 全部后端失效", path))
 					return
 				}
 			}
 
-			logger.L(`T:`, fmt.Sprintf("%s=>%s", path, backArray[backI].Name))
+			logger.Error(`T:`, fmt.Sprintf("%s=>%s", path, backArray[backI].Name))
 
 			var e error
 			if r.Header.Get("Upgrade") == "websocket" {
@@ -191,11 +213,20 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 				e = httpDealer(ctx1, w, r, path, backArray[backI], logger)
 			}
 			if e != nil {
-				logger.L(`W:`, fmt.Sprintf("%s=>%s %v", path, backArray[backI].Name, e))
-				backArray[backI].Disable()
-				if !errors.Is(e, ErrCopy) && ErrRedirect {
-					w.Header().Set("Location", r.URL.String())
-					w.WriteHeader(http.StatusTemporaryRedirect)
+				logger.Warn(`W:`, fmt.Sprintf("%s=>%s %v", path, backArray[backI].Name, e))
+				switch e {
+				case ErrCopy:
+					backArray[backI].Disable()
+					return
+				case ErrHeaderCheckFail:
+					w.WriteHeader(http.StatusForbidden)
+					return
+				default:
+					backArray[backI].Disable()
+					if ErrRedirect {
+						w.Header().Set("Location", r.URL.String())
+						w.WriteHeader(http.StatusTemporaryRedirect)
+					}
 				}
 			}
 		})
@@ -213,7 +244,7 @@ var (
 	ErrHeaderCheckFail = errors.New("ErrHeaderCheckFail")
 )
 
-func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, back *Back, logger *plog.Log_interface) error {
+func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, back *Back, logger Logger) error {
 	url := back.To
 	if back.PathAdd {
 		url += r.URL.String()
@@ -245,7 +276,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 		case `del`:
 			req.Header.Del(v.Key)
 		default:
-			logger.L(`W:`, fmt.Sprintf("%s=>%s 无效ReqHeader %v", routePath, back.Name, v))
+			logger.Warn(`W:`, fmt.Sprintf("%s=>%s 无效ReqHeader %v", routePath, back.Name, v))
 		}
 	}
 	client := http.Client{}
@@ -271,7 +302,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 		case `del`:
 			w.Header().Del(v.Key)
 		default:
-			logger.L(`W:`, fmt.Sprintf("%s=>%s 无效ResHeader %v", routePath, back.Name, v))
+			logger.Warn(`W:`, fmt.Sprintf("%s=>%s 无效ResHeader %v", routePath, back.Name, v))
 		}
 	}
 
@@ -283,13 +314,13 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 	defer resp.Body.Close()
 	if _, e = io.Copy(w, resp.Body); e != nil {
-		logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
+		logger.Error(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
 		return ErrCopy
 	}
 	return nil
 }
 
-func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, back *Back, logger *plog.Log_interface) error {
+func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, back *Back, logger Logger) error {
 	url := back.To
 	if back.PathAdd {
 		url += r.URL.String()
@@ -313,7 +344,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		case `del`:
 			reqHeader.Del(v.Key)
 		default:
-			logger.L(`W:`, fmt.Sprintf("%s=>%s 无效ReqHeader %v", routePath, back.Name, v))
+			logger.Warn(`W:`, fmt.Sprintf("%s=>%s 无效ReqHeader %v", routePath, back.Name, v))
 		}
 	}
 	if res, resp, e := websocket.DefaultDialer.Dial(url, reqHeader); e != nil {
@@ -332,7 +363,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 			case `del`:
 				resp.Header.Del(v.Key)
 			default:
-				logger.L(`W:`, fmt.Sprintf("%s=>%s 无效ResHeader %v", routePath, back.Name, v))
+				logger.Warn(`W:`, fmt.Sprintf("%s=>%s 无效ResHeader %v", routePath, back.Name, v))
 			}
 		}
 
@@ -369,7 +400,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 				resc.Close()
 			}()
 			if e := <-fin; e != nil {
-				logger.L(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
+				logger.Error(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
 				return ErrCopy
 			}
 			return nil
