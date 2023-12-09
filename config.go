@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -24,6 +25,7 @@ type Config struct {
 type Route struct {
 	Path        string `json:"path"`
 	Sign        string `json:"-"`
+	Splicing    int    `json:"splicing"`
 	ErrRedirect bool   `json:"errRedirect"`
 	Back        []Back `json:"back"`
 }
@@ -44,14 +46,20 @@ func (t *Route) GenBack() []*Back {
 	var backLink []*Back
 	for i := 0; i < len(t.Back); i++ {
 		back := &t.Back[i]
+		back.SwapSign()
+		if back.Weight == 0 {
+			continue
+		}
 		tmpBack := Back{
-			Name:      back.Name,
-			To:        back.To,
-			Weight:    back.Weight,
-			ErrBanSec: back.ErrBanSec,
-			PathAdd:   back.PathAdd,
-			ReqHeader: append([]Header{}, back.ReqHeader...),
-			ResHeader: append([]Header{}, back.ResHeader...),
+			Name:        back.Name,
+			Sign:        back.Sign,
+			To:          back.To,
+			Weight:      back.Weight,
+			ErrBanSec:   back.ErrBanSec,
+			PathAdd:     back.PathAdd,
+			MatchHeader: append([]Header{}, back.MatchHeader...),
+			ReqHeader:   append([]Header{}, back.ReqHeader...),
+			ResHeader:   append([]Header{}, back.ResHeader...),
 		}
 		for i := 1; i <= back.Weight; i++ {
 			backLink = append(backLink, &tmpBack)
@@ -60,16 +68,44 @@ func (t *Route) GenBack() []*Back {
 	return backLink
 }
 
+func GetBackByRequest(backs []*Back, r *http.Request) []*Back {
+	var backLink []*Back
+	for i := 0; i < len(backs); i++ {
+		matchs := len(backs[i].MatchHeader) - 1
+		for ; matchs >= 0 &&
+			r.Header.Get(backs[i].MatchHeader[matchs].Key) == backs[i].MatchHeader[matchs].Value; matchs -= 1 {
+		}
+		if matchs == -1 {
+			backLink = append(backLink, backs[i])
+		}
+	}
+	return backLink
+}
+
 type Back struct {
-	lock      sync.RWMutex
-	upT       time.Time
-	Name      string   `json:"name"`
-	To        string   `json:"to"`
-	Weight    int      `json:"weight"`
-	ErrBanSec int      `json:"errBanSec"`
-	PathAdd   bool     `json:"pathAdd"`
-	ReqHeader []Header `json:"reqHeader"`
-	ResHeader []Header `json:"resHeader"`
+	lock        sync.RWMutex
+	Sign        string `json:"-"`
+	upT         time.Time
+	Name        string   `json:"name"`
+	To          string   `json:"to"`
+	Weight      int      `json:"weight"`
+	ErrBanSec   int      `json:"errBanSec"`
+	PathAdd     bool     `json:"pathAdd"`
+	MatchHeader []Header `json:"matchHeader"`
+	ReqHeader   []Header `json:"reqHeader"`
+	ResHeader   []Header `json:"resHeader"`
+}
+
+func (t *Back) SwapSign() bool {
+	data, _ := json.Marshal(t)
+	w := md5.New()
+	w.Write(data)
+	sign := fmt.Sprintf("%x", w.Sum(nil))
+	if t.Sign != sign {
+		t.Sign = sign
+		return true
+	}
+	return false
 }
 
 func (t *Back) IsLive() bool {
@@ -79,6 +115,9 @@ func (t *Back) IsLive() bool {
 }
 
 func (t *Back) Disable() {
+	if t.ErrBanSec == 0 {
+		return
+	}
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.upT = time.Now().Add(time.Second * time.Duration(t.ErrBanSec))

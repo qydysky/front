@@ -16,7 +16,6 @@
             "to": "http://127.0.0.1:13000",
             "weight": 1,
             "pathAdd": false,
-            "errBanSec": 10,
             "resHeader": [
               {
                 "action": "set",
@@ -33,7 +32,7 @@
     "matchRule": "prefix",
     "routes": [
       {
-        "path": "/2",
+        "matcher": "/2",
         "errRedirect": true,
         "back": [
           {
