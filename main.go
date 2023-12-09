@@ -28,7 +28,7 @@ type File interface {
 }
 
 // 加载
-func LoadPeriod(ctx context.Context, buf []byte, configF File, configS *Config, logger Logger) error {
+func LoadPeriod(ctx context.Context, buf []byte, configF File, configS *[]Config, logger Logger) error {
 	if e := loadConfig(buf, configF, configS); e != nil {
 		logger.Error(`E:`, "配置加载", e)
 		return e
@@ -129,25 +129,28 @@ func Run(ctx context.Context, configSP *Config, logger Logger) {
 	}
 }
 
-func loadConfig(buf []byte, configF File, configS *Config) error {
+func loadConfig(buf []byte, configF File, configS *[]Config) error {
 	if i, e := configF.Read(buf); e != nil && !errors.Is(e, io.EOF) {
 		return e
 	} else if i == cap(buf) {
 		return errors.New(`buf full`)
 	} else {
-		configS.lock.Lock()
-		defer configS.lock.Unlock()
+		for i := 0; i < len(*configS); i++ {
+			(*configS)[i].lock.Lock()
+			defer (*configS)[i].lock.Unlock()
+		}
 		if e := json.Unmarshal(buf[:i], configS); e != nil {
 			return e
 		}
-
-		if configS.TLS.Key != "" && configS.TLS.Pub != "" {
-			if cert, e := tls.LoadX509KeyPair(configS.TLS.Pub, configS.TLS.Key); e != nil {
-				return e
-			} else {
-				configS.TLS.Config = &tls.Config{
-					Certificates: []tls.Certificate{cert},
-					NextProtos:   []string{"h2", "http/1.1"},
+		for i := 0; i < len((*configS)); i++ {
+			if (*configS)[i].TLS.Config == nil && (*configS)[i].TLS.Key != "" && (*configS)[i].TLS.Pub != "" {
+				if cert, e := tls.LoadX509KeyPair((*configS)[i].TLS.Pub, (*configS)[i].TLS.Key); e != nil {
+					return e
+				} else {
+					(*configS)[i].TLS.Config = &tls.Config{
+						Certificates: []tls.Certificate{cert},
+						NextProtos:   []string{"h2", "http/1.1"},
+					}
 				}
 			}
 		}

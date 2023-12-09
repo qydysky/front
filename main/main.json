@@ -1,30 +1,57 @@
-{
-    "addr":"0.0.0.0:9009",
+[
+  {
+    "addr": "0.0.0.0:9009",
     "tls": {
-        "pub":"cert.pem",
-        "key":"key.pem"
+      "pub": "cert.pem",
+      "key": "key.pem"
     },
     "matchRule": "prefix",
-    "routes":[
-        {
-            "path": "/1",
-            "errRedirect": true,
-            "back": [
-                {
-                    "name": "test",
-                    "to": "http://127.0.0.1:13000",
-                    "weight": 1,
-                    "pathAdd": false,
-                    "errBanSec": 10,
-                    "resHeader":[
-                        {
-                            "action": "set",
-                            "key": "KEY",
-                            "value": "asf"
-                        }
-                    ]
-                }
+    "routes": [
+      {
+        "path": "/1",
+        "errRedirect": true,
+        "back": [
+          {
+            "name": "test",
+            "to": "http://127.0.0.1:13000",
+            "weight": 1,
+            "pathAdd": false,
+            "errBanSec": 10,
+            "resHeader": [
+              {
+                "action": "set",
+                "key": "KEY",
+                "value": "asf"
+              }
             ]
-        }
+          }
+        ]
+      }
     ]
-}
+  },{
+    "addr": "0.0.0.0:9010",
+    "matchRule": "prefix",
+    "routes": [
+      {
+        "path": "/2",
+        "errRedirect": true,
+        "back": [
+          {
+            "name": "test",
+            "to": "http://127.0.0.1:13000",
+            "weight": 1,
+            "pathAdd": false,
+            "errBanSec": 10,
+            "resHeader": [
+              {
+                "action": "set",
+                "key": "KEY",
+                "value": "asf"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

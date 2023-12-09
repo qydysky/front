@@ -49,7 +49,7 @@ func main() {
 	ctx, cancle := pctx.WithWait(context.Background(), 0, time.Minute*2)
 
 	// 获取config
-	configS := pfront.Config{}
+	configS := []pfront.Config{}
 	configF := pfile.New(*configP, 0, true)
 	if !configF.IsExist() {
 		logger.L(`E:`, "配置不存在")
@@ -67,7 +67,9 @@ func main() {
 	// 测试响应
 	go pfront.Test(ctx, *testP, logger.Base("测试"))
 
-	go pfront.Run(ctx, &configS, logger.Base("转发"))
+	for i := 0; i < len(configS); i++ {
+		go pfront.Run(ctx, &configS[i], logger.Base(configS[i].Addr))
+	}
 
 	// ctrl+c退出
 	var interrupt = make(chan os.Signal, 2)
