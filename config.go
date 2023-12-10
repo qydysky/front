@@ -116,7 +116,7 @@ func (t *Back) IsLive() bool {
 
 func (t *Back) Disable() {
 	if t.ErrBanSec == 0 {
-		return
+		t.ErrBanSec = 1
 	}
 	t.lock.Lock()
 	defer t.lock.Unlock()

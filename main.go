@@ -244,6 +244,7 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 					Value:  backI.Sign,
 					MaxAge: splicing,
 					Path:   path,
+					Domain: r.Host,
 				}).String())
 			}
 
