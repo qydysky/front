@@ -75,6 +75,11 @@ func main() {
 	var interrupt = make(chan os.Signal, 2)
 	signal.Notify(interrupt, os.Interrupt)
 	<-interrupt
+	logger.L(`I:`, "退出中,再次ctrl+c强制退出")
+	go func() {
+		<-interrupt
+		os.Exit(1)
+	}()
 	if errors.Is(cancle(), pctx.ErrWaitTo) {
 		logger.L(`E:`, "退出超时")
 	}
