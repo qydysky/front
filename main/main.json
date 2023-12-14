@@ -6,6 +6,7 @@
       "key": "key.pem"
     },
     "matchRule": "prefix",
+    "copyBlocks": 100,
     "routes": [
       {
         "path": "/1",

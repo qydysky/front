@@ -128,6 +128,13 @@ func Run(ctx context.Context, configSP *Config, logger Logger) {
 		httpSer.TLSConfig = configSP.TLS.Config.Clone()
 	}
 
+	if configSP.BlocksI == nil {
+		if configSP.CopyBlocks == 0 {
+			configSP.CopyBlocks = 1000
+		}
+		configSP.BlocksI = pslice.NewBlocks[byte](16*1024, configSP.CopyBlocks)
+	}
+
 	syncWeb := pweb.NewSyncMap(&httpSer, &routeP, matchfunc)
 	defer syncWeb.Shutdown()
 
@@ -268,9 +275,9 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 
 			var e error
 			if r.Header.Get("Upgrade") == "websocket" {
-				e = wsDealer(ctx1, w, r, path, backI, logger)
+				e = wsDealer(ctx1, w, r, path, backI, logger, configS.BlocksI)
 			} else {
-				e = httpDealer(ctx1, w, r, path, backI, logger)
+				e = httpDealer(ctx1, w, r, path, backI, logger, configS.BlocksI)
 			}
 			if e != nil {
 				logger.Warn(`W:`, fmt.Sprintf("%s=>%s %v", path, backI.Name, e))
@@ -304,7 +311,7 @@ var (
 	ErrHeaderCheckFail = errors.New("ErrHeaderCheckFail")
 )
 
-func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, back *Back, logger Logger) error {
+func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, back *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	url := back.To
 	if back.PathAdd {
 		url += r.URL.String()
@@ -348,14 +355,20 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 	}
 
 	defer resp.Body.Close()
-	if _, e = io.Copy(w, resp.Body); e != nil {
+	if tmpbuf, put, e := blocksi.Get(); e != nil {
 		logger.Error(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
 		return errors.Join(ErrCopy, e)
+	} else {
+		defer put()
+		if _, e = io.CopyBuffer(w, resp.Body, tmpbuf); e != nil {
+			logger.Error(`E:`, fmt.Sprintf("%s=>%s %v", routePath, back.Name, e))
+			return errors.Join(ErrCopy, e)
+		}
 	}
 	return nil
 }
 
-func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, back *Back, logger Logger) error {
+func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, back *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	url := back.To
 	if back.PathAdd {
 		url += r.URL.String()
@@ -387,12 +400,12 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 			defer req.Close()
 
 			select {
-			case e := <-copyWsMsg(req, res):
+			case e := <-copyWsMsg(req, res, blocksi):
 				if e != nil {
 					logger.Error(`E:`, fmt.Sprintf("%s=>%s s->c %v", routePath, back.Name, e))
 					return errors.Join(ErrCopy, e)
 				}
-			case e := <-copyWsMsg(res, req):
+			case e := <-copyWsMsg(res, req, blocksi):
 				if e != nil {
 					logger.Error(`E:`, fmt.Sprintf("%s=>%s c->s %v", routePath, back.Name, e))
 					return errors.Join(ErrCopy, e)
@@ -429,16 +442,14 @@ func copyHeader(s, t http.Header, app []Header) error {
 	return nil
 }
 
-var copyBuf = pslice.NewBlocks[byte](16*1024, 100)
-
-func copyWsMsg(dst io.Writer, src io.Reader) <-chan error {
+func copyWsMsg(dst io.Writer, src io.Reader, blocksi pslice.BlocksI[byte]) <-chan error {
 	c := make(chan error, 1)
 	go func() {
-		if tmpbuf, put, e := copyBuf.Get(); e != nil {
+		if tmpbuf, put, e := blocksi.Get(); e != nil {
 			c <- e
 		} else {
+			defer put()
 			_, e := io.CopyBuffer(dst, src, tmpbuf)
-			put()
 			c <- e
 		}
 	}()

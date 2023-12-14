@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	pslice "github.com/qydysky/part/slice"
 )
 
 type Config struct {
@@ -18,8 +20,10 @@ type Config struct {
 		Pub    string      `json:"pub"`
 		Key    string      `json:"key"`
 	} `json:"tls"`
-	MatchRule string  `json:"matchRule"`
-	Routes    []Route `json:"routes"`
+	MatchRule  string               `json:"matchRule"`
+	CopyBlocks int                  `json:"copyBlocks"`
+	BlocksI    pslice.BlocksI[byte] `json:"-"`
+	Routes     []Route              `json:"routes"`
 }
 
 type Route struct {
