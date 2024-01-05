@@ -1,54 +1,24 @@
 [
   {
-    "addr": "0.0.0.0:9009",
-    "tls": {
-      "pub": "cert.pem",
-      "key": "key.pem"
-    },
+    "addr": "0.0.0.0:8081",
     "matchRule": "prefix",
     "copyBlocks": 100,
     "routes": [
       {
-        "path": "/1",
-        "errRedirect": true,
+        "path": "/",
+        "errRedirect": false,
         "back": [
           {
-            "name": "test",
-            "to": "://127.0.0.1:13000",
+            "name": "baidu1",
+            "to": "s://www.baidu.com",
             "weight": 1,
-            "pathAdd": false,
-            "resHeader": [
-              {
-                "action": "set",
-                "key": "KEY",
-                "value": "asf"
-              }
-            ]
-          }
-        ]
-      }
-    ]
-  },{
-    "addr": "0.0.0.0:9010",
-    "matchRule": "prefix",
-    "routes": [
-      {
-        "matcher": "/2",
-        "errRedirect": true,
-        "back": [
+            "pathAdd": true
+          },
           {
-            "name": "test",
-            "to": "://127.0.0.1:13000",
+            "name": "baidu2",
+            "to": "s://www.baidu.com",
             "weight": 1,
-            "pathAdd": false,
-            "errBanSec": 10,
-            "resHeader": [
-              {
-                "action": "set",
-                "key": "KEY",
-                "value": "asf"
-              }
-            ]
+            "pathAdd": true
           }
         ]
       }

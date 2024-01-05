@@ -27,11 +27,10 @@ type Config struct {
 }
 
 type Route struct {
-	Path        string `json:"path"`
-	Sign        string `json:"-"`
-	Splicing    int    `json:"splicing"`
-	ErrRedirect bool   `json:"errRedirect"`
-	Back        []Back `json:"back"`
+	Path     string `json:"path"`
+	Sign     string `json:"-"`
+	Splicing int    `json:"splicing"`
+	Back     []Back `json:"back"`
 }
 
 func (t *Route) SwapSign() bool {
@@ -56,6 +55,7 @@ func (t *Route) GenBack() []*Back {
 		}
 		tmpBack := Back{
 			Name:        back.Name,
+			Splicing:    t.Splicing,
 			Sign:        back.Sign,
 			To:          back.To,
 			Weight:      back.Weight,
@@ -72,14 +72,14 @@ func (t *Route) GenBack() []*Back {
 	return backLink
 }
 
-func GetBackByRequest(backs []*Back, r *http.Request) []*Back {
+func FiliterBackByRequest(backs []*Back, r *http.Request) []*Back {
 	var backLink []*Back
 	for i := 0; i < len(backs); i++ {
 		matchs := len(backs[i].MatchHeader) - 1
 		for ; matchs >= 0 &&
 			r.Header.Get(backs[i].MatchHeader[matchs].Key) == backs[i].MatchHeader[matchs].Value; matchs -= 1 {
 		}
-		if matchs == -1 {
+		if matchs == -1 && backs[i].IsLive() {
 			backLink = append(backLink, backs[i])
 		}
 	}
@@ -89,6 +89,7 @@ func GetBackByRequest(backs []*Back, r *http.Request) []*Back {
 type Back struct {
 	lock        sync.RWMutex
 	Sign        string `json:"-"`
+	Splicing    int    `json:"-"`
 	upT         time.Time
 	Name        string   `json:"name"`
 	To          string   `json:"to"`
