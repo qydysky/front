@@ -271,7 +271,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 	)
 
 	for 0 < len(backs) && resp == nil {
-		chosenBack = backs[0]
+		chosenBack = backs[nanotime1()%int64(len(backs))]
 		backs = backs[1:]
 
 		url := chosenBack.To
@@ -364,7 +364,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 	)
 
 	for 0 < len(backs) && resp == nil {
-		chosenBack = backs[0]
+		chosenBack = backs[nanotime1()%int64(len(backs))]
 		backs = backs[1:]
 
 		url := chosenBack.To
