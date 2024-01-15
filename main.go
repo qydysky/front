@@ -255,6 +255,7 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 }
 
 var (
+	ErrRedirect        = errors.New("ErrRedirect")
 	ErrNoHttp          = errors.New("ErrNoHttp")
 	ErrNoWs            = errors.New("ErrNoWs")
 	ErrCopy            = errors.New("ErrCopy")
@@ -301,9 +302,13 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 		req.Header.Del("Referer")
 
-		client := http.Client{}
+		client := http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return ErrRedirect
+			},
+		}
 		resp, e = client.Do(req)
-		if e != nil {
+		if e != nil && !errors.Is(e, ErrRedirect) {
 			chosenBack.Disable()
 			logger.Warn(`W:`, fmt.Sprintf("%s=>%s %v", routePath, chosenBack.Name, e))
 		}
@@ -363,7 +368,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		chosenBack *Back
 	)
 
-	for 0 < len(backs) && resp == nil {
+	for 0 < len(backs) && (resp == nil || conn == nil) {
 		chosenBack = backs[nanotime1()%int64(len(backs))]
 		backs = backs[1:]
 
