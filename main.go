@@ -300,8 +300,6 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 			return e
 		}
 
-		req.Header.Del("Referer")
-
 		client := http.Client{
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				return ErrRedirect
@@ -385,8 +383,6 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 			logger.Warn(`W:`, fmt.Sprintf("%s=>%s %v", routePath, chosenBack.Name, e))
 			return e
 		}
-
-		reqHeader.Del("Referer")
 
 		var e error
 		conn, resp, e = DialContext(ctx, url, reqHeader)
