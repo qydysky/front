@@ -30,6 +30,7 @@ type Route struct {
 	Path     string `json:"path"`
 	Sign     string `json:"-"`
 	Splicing int    `json:"splicing"`
+	PathAdd  bool   `json:"pathAdd"`
 	Back     []Back `json:"back"`
 }
 
@@ -60,7 +61,7 @@ func (t *Route) GenBack() []*Back {
 			To:          back.To,
 			Weight:      back.Weight,
 			ErrBanSec:   back.ErrBanSec,
-			PathAdd:     back.PathAdd,
+			PathAdd:     t.PathAdd,
 			MatchHeader: append([]Header{}, back.MatchHeader...),
 			ReqHeader:   append([]Header{}, back.ReqHeader...),
 			ResHeader:   append([]Header{}, back.ResHeader...),
@@ -90,12 +91,12 @@ type Back struct {
 	lock        sync.RWMutex
 	Sign        string `json:"-"`
 	Splicing    int    `json:"-"`
+	PathAdd     bool   `json:"-"`
 	upT         time.Time
 	Name        string   `json:"name"`
 	To          string   `json:"to"`
 	Weight      int      `json:"weight"`
 	ErrBanSec   int      `json:"errBanSec"`
-	PathAdd     bool     `json:"pathAdd"`
 	MatchHeader []Header `json:"matchHeader"`
 	ReqHeader   []Header `json:"reqHeader"`
 	ResHeader   []Header `json:"resHeader"`

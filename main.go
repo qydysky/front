@@ -267,6 +267,7 @@ var (
 
 func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, backs []*Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	var (
+		opT        = time.Now()
 		resp       *http.Response
 		chosenBack *Back
 	)
@@ -319,7 +320,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 		return errors.New("后端故障")
 	}
 
-	logger.Error(`T:`, fmt.Sprintf("%s=>%s", routePath, chosenBack.Name))
+	logger.Debug(`T:`, fmt.Sprintf("http %s=>%s %v", routePath, chosenBack.Name, time.Since(opT)))
 
 	if validCookieDomain(r.Host) {
 		w.Header().Add("Set-Cookie", (&http.Cookie{
@@ -361,6 +362,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, backs []*Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	var (
+		opT        = time.Now()
 		resp       *http.Response
 		conn       net.Conn
 		chosenBack *Back
@@ -399,7 +401,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		return errors.New("后端故障")
 	}
 
-	logger.Error(`T:`, fmt.Sprintf("%s=>%s", routePath, chosenBack.Name))
+	logger.Debug(`T:`, fmt.Sprintf("ws %s=>%s %v", routePath, chosenBack.Name, time.Since(opT)))
 
 	if validCookieDomain(r.Host) {
 		w.Header().Add("Set-Cookie", (&http.Cookie{

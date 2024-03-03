@@ -7,18 +7,17 @@
       {
         "path": "/",
         "errRedirect": false,
+        "pathAdd": true,
         "back": [
           {
             "name": "baidu1",
             "to": "s://www.baidu.com",
-            "weight": 1,
-            "pathAdd": true
+            "weight": 1
           },
           {
             "name": "baidu2",
             "to": "s://www.baidu.com",
-            "weight": 1,
-            "pathAdd": true
+            "weight": 1
           }
         ]
       }
