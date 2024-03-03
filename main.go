@@ -51,7 +51,7 @@ func LoadPeriod(ctx context.Context, buf []byte, configF File, configS *[]Config
 		defer done1()
 		for {
 			select {
-			case <-time.After(time.Second * 10):
+			case <-time.After(time.Second * 5):
 				if e := loadConfig(buf, configF, configS); e != nil {
 					logger.Error(`E:`, "配置加载", e)
 				}
@@ -142,7 +142,7 @@ func Run(ctx context.Context, configSP *Config, logger Logger) {
 	// 定时加载config
 	for {
 		select {
-		case <-time.After(time.Second * 10):
+		case <-time.After(time.Second * 5):
 			_ = applyConfig(ctx, configSP, &routeP, logger)
 		case <-ctx.Done():
 			return
@@ -186,6 +186,12 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 	configS.lock.RLock()
 	defer configS.lock.RUnlock()
 
+	for _, v := range configS.SwapSign() {
+		logger.Info(`I:`, "路由移除", v.Path)
+		routeP.Store(v.Path, nil)
+		v.Sign = ""
+	}
+
 	for i := 0; i < len(configS.Routes); i++ {
 		route := &configS.Routes[i]
 		path := route.Path
@@ -195,7 +201,7 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 		}
 
 		if len(route.Back) == 0 {
-			logger.Info(`I:`, "移除路由", path)
+			logger.Info(`I:`, "路由移除", path)
 			routeP.Store(path, nil)
 			continue
 		}
@@ -203,7 +209,7 @@ func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, log
 		backArray := route.GenBack()
 
 		if len(backArray) == 0 {
-			logger.Info(`I:`, "移除路由", path)
+			logger.Info(`I:`, "路由移除", path)
 			routeP.Store(path, nil)
 			continue
 		}

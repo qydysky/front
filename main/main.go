@@ -24,7 +24,8 @@ func main() {
 	// 获取config路径
 	configP := flag.String("c", "main.json", "config")
 	testP := flag.Int("t", 0, "test port")
-	_ = flag.Bool("q", false, "no warn,error log")
+	_ = flag.Bool("q", false, "no log")
+	_ = flag.Bool("dq", false, "no debug log")
 	flag.Parse()
 
 	// 日志初始化
@@ -39,9 +40,14 @@ func main() {
 	})
 
 	if slices.Contains(os.Args[1:], "-q") {
-		logger.L(`I:`, "简化输出")
 		delete(logger.Config.Prefix_string, `E:`)
 		delete(logger.Config.Prefix_string, `W:`)
+		delete(logger.Config.Prefix_string, `I:`)
+		delete(logger.Config.Prefix_string, `T:`)
+	}
+
+	if slices.Contains(os.Args[1:], "-dq") {
+		logger.L(`I:`, "关闭输出debug")
 		delete(logger.Config.Prefix_string, `T:`)
 	}
 

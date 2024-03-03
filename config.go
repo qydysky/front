@@ -14,7 +14,8 @@ import (
 
 type Config struct {
 	lock sync.RWMutex
-	Addr string `json:"addr"`
+	Sign []*Route `json:"-"`
+	Addr string   `json:"addr"`
 	TLS  struct {
 		Config *tls.Config `json:"-"`
 		Pub    string      `json:"pub"`
@@ -24,6 +25,30 @@ type Config struct {
 	CopyBlocks int                  `json:"copyBlocks"`
 	BlocksI    pslice.BlocksI[byte] `json:"-"`
 	Routes     []Route              `json:"routes"`
+}
+
+func (t *Config) SwapSign() []*Route {
+	var delRoute []*Route
+	for i := 0; i < len(t.Sign); i++ {
+		var exist bool
+		for k := 0; k < len(t.Routes); k++ {
+			if t.Sign[i].Path == t.Routes[k].Path {
+				exist = true
+				break
+			}
+		}
+		if !exist {
+			delRoute = append(delRoute, t.Sign[i])
+		}
+	}
+
+	t.Sign = t.Sign[:0]
+
+	for i := 0; i < len(t.Routes); i++ {
+		t.Sign = append(t.Sign, &t.Routes[i])
+	}
+
+	return delRoute
 }
 
 type Route struct {

@@ -6,7 +6,6 @@
     "routes": [
       {
         "path": "/",
-        "errRedirect": false,
         "pathAdd": true,
         "back": [
           {
@@ -16,6 +15,17 @@
           },
           {
             "name": "baidu2",
+            "to": "s://www.baidu.com",
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "path": "/s",
+        "pathAdd": true,
+        "back": [
+          {
+            "name": "baidus",
             "to": "s://www.baidu.com",
             "weight": 1
           }
