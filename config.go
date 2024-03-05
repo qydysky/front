@@ -2,7 +2,6 @@ package front
 
 import (
 	"context"
-	"crypto/md5"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -89,18 +88,12 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 				}
 			}
 
-			if len(backIs) == 0 {
-				backIs = append(backIs, route.FiliterBackByRequest(r)...)
-			}
+			backIs = append(backIs, route.FiliterBackByRequest(r)...)
 
 			if len(backIs) == 0 {
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
-
-			rand.Shuffle(len(backIs), func(i, j int) {
-				backIs[i], backIs[j] = backIs[j], backIs[i]
-			})
 
 			var e error
 			if r.Header.Get("Upgrade") == "websocket" {
@@ -253,6 +246,9 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 			}
 		}
 	}
+	rand.Shuffle(len(backLink), func(i, j int) {
+		backLink[i], backLink[j] = backLink[j], backLink[i]
+	})
 	return backLink
 }
 
@@ -272,32 +268,8 @@ type Back struct {
 	ResHeader   []Header `json:"resHeader"`
 }
 
-// func (t *Back) Init() (e error) {
-// 	for i := 0; i < len(t.MatchHeader); i++ {
-// 		e = t.MatchHeader[i].Init()
-// 		if e != nil {
-// 			return e
-// 		}
-// 	}
-// 	for i := 0; i < len(t.ReqHeader); i++ {
-// 		e = t.ReqHeader[i].Init()
-// 		if e != nil {
-// 			return e
-// 		}
-// 	}
-// 	for i := 0; i < len(t.ResHeader); i++ {
-// 		e = t.ResHeader[i].Init()
-// 		if e != nil {
-// 			return e
-// 		}
-// 	}
-// 	return
-// }
-
 func (t *Back) Id() string {
-	w := md5.New()
-	w.Write([]byte(t.Name + t.To))
-	return fmt.Sprintf("%x", w.Sum(nil))
+	return fmt.Sprintf("%p", t)
 }
 
 func Matched(matchHeader []Header, r *http.Request) bool {
