@@ -72,9 +72,17 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 			ctx1, done1 := pctx.WaitCtx(ctx)
 			defer done1()
 
+			if !Matched(route.MatchHeader, r) {
+				w.WriteHeader(http.StatusNotFound)
+			}
+
 			var backIs []*Back
 			if t, e := r.Cookie("_psign_" + cookie); e == nil {
 				if backP, ok := route.backMap.Load(t.Value); ok && backP.(*Back).IsLive() && Matched(backP.(*Back).MatchHeader, r) {
+					backP.(*Back).PathAdd = route.PathAdd
+					backP.(*Back).Splicing = route.Splicing
+					backP.(*Back).ReqHeader = append(route.ReqHeader, backP.(*Back).ReqHeader...)
+					backP.(*Back).ResHeader = append(route.ResHeader, backP.(*Back).ResHeader...)
 					for i := 0; i < backP.(*Back).Weight; i++ {
 						backIs = append(backIs, backP.(*Back))
 					}
@@ -86,7 +94,7 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 			}
 
 			if len(backIs) == 0 {
-				w.WriteHeader(http.StatusServiceUnavailable)
+				w.WriteHeader(http.StatusNotFound)
 				return
 			}
 
@@ -157,11 +165,6 @@ func (t *Config) SwapSign(add func(*Route), del func(*Route), logger Logger) {
 		t.Routes[i].SwapSign(
 			func(b *Back) {
 				logger.Info(`I:`, "后端加载", t.Routes[i].Path, b.Name)
-				b.PathAdd = t.Routes[i].PathAdd
-				b.Splicing = t.Routes[i].Splicing
-				b.MatchHeader = append(b.MatchHeader, t.Routes[i].MatchHeader...)
-				b.ReqHeader = append(b.ReqHeader, t.Routes[i].ReqHeader...)
-				b.ResHeader = append(b.ResHeader, t.Routes[i].ResHeader...)
 				t.Routes[i].backMap.Store(b.Id(), b)
 			},
 			func(b *Back) {
@@ -241,6 +244,10 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var backLink []*Back
 	for i := 0; i < len(t.Backs); i++ {
 		if t.Backs[i].IsLive() && Matched(t.Backs[i].MatchHeader, r) {
+			t.Backs[i].PathAdd = t.PathAdd
+			t.Backs[i].Splicing = t.Splicing
+			t.Backs[i].ReqHeader = append(t.ReqHeader, t.Backs[i].ReqHeader...)
+			t.Backs[i].ResHeader = append(t.ResHeader, t.Backs[i].ResHeader...)
 			for k := 0; k < t.Backs[i].Weight; k++ {
 				backLink = append(backLink, &t.Backs[i])
 			}

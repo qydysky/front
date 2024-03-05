@@ -332,8 +332,8 @@ func copyHeader(s, t http.Header, app []Header) error {
 				return ErrHeaderCheckFail
 			}
 		case `replace`:
-			if va := t.Get(v.Key); va != "" {
-				t.Set(v.Key, regexp.MustCompile(v.MatchExp).ReplaceAllString(va, v.Value))
+			if va, ok := tm[v.Key]; ok && len(va) != 0 {
+				tm[v.Key][0] = regexp.MustCompile(v.MatchExp).ReplaceAllString(va[0], v.Value)
 			}
 		case `set`:
 			t.Set(v.Key, v.Value)

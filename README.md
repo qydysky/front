@@ -22,20 +22,20 @@
     - path: string 路径
     - splicing: int 当客户端支持cookie时，将会固定使用后端多少秒
     - pathAdd: bool 将客户端访问的路径附加在path上 例：/api/req => /ws => /ws/api/req
-    - matchHeader: [] 将会附加到每个backs，匹配客户端请求头，只有都匹配才使用此后端, 可以动态增加/删除
+    - matchHeader: [] 将会在back前匹配，匹配客户端请求头，只有都匹配才使用此路由, 可以动态增加/删除
         - key: string 要匹配的header名
         - matchExp: string 要匹配的正则式
         - value: string 要匹配的值
-    - reqHeader: [] 将会附加到每个backs，请求后端时，请求头处理器, 可以动态增加/删除
+    - reqHeader: [] 将会附加到每个backs前，请求后端时，请求头处理器, 可以动态增加/删除
+        - action: string 可选check、replace、add、del、set。
+        - key: string 具体处理哪个头
+        - matchExp: string check时，如不匹配将结束请求。replace时结合value进行替换
+        - value: string check时，如不匹配将结束请求。replace时结合matchExp进行替换。add时将附加值。set时将覆盖值。
+    - resHeader: [] 将会附加到每个backs前，返回后端的响应时，请求头处理器, 可以动态增加/删除
         - action: string 可选check、add、del、set。
         - key: string 具体处理哪个头
-        - matchExp: string check时，如不匹配将结束请求。
-        - value: string check时，如不匹配将结束请求。add时将附加值。set时将覆盖值。
-    - resHeader: [] 将会附加到每个backs，返回后端的响应时，请求头处理器, 可以动态增加/删除
-        - action: string 可选check、add、del、set。
-        - key: string 具体处理哪个头
-        - matchExp: string check时，如不匹配将结束请求。
-        - value: string check时，如不匹配将结束请求。add时将附加值。set时将覆盖值。
+        - matchExp: string check时，如不匹配将结束请求。replace时结合value进行替换
+        - value: string check时，如不匹配将结束请求。replace时结合matchExp进行替换。add时将附加值。set时将覆盖值。
     - backs: [] 后端, 可以动态增加/删除
         - name: string 后端名称，将在日志中显示
         - to: string 后端地址，例"s://www.baidu.com"，会根据客户端自动添加http or ws在地址前
@@ -45,13 +45,13 @@
             - key: string 要匹配的header名
             - matchExp: string 要匹配的正则式
             - value: string 要匹配的值
-        - reqHeader: [] 请求后端时，请求头处理器, 可以动态增加/删除
+        - reqHeader: [] 将会附加到每个backs前，请求后端时，请求头处理器, 可以动态增加/删除
+            - action: string 可选check、replace、add、del、set。
+            - key: string 具体处理哪个头
+            - matchExp: string check时，如不匹配将结束请求。replace时结合value进行替换
+            - value: string check时，如不匹配将结束请求。replace时结合matchExp进行替换。add时将附加值。set时将覆盖值。
+        - resHeader: [] 将会附加到每个backs前，返回后端的响应时，请求头处理器, 可以动态增加/删除
             - action: string 可选check、add、del、set。
             - key: string 具体处理哪个头
-            - matchExp: string check时，如不匹配将结束请求。
-            - value: string check时，如不匹配将结束请求。add时将附加值。set时将覆盖值。
-        - resHeader: [] 返回后端的响应时，请求头处理器, 可以动态增加/删除
-            - action: string 可选check、add、del、set。
-            - key: string 具体处理哪个头
-            - matchExp: string check时，如不匹配将结束请求。
-            - value: string check时，如不匹配将结束请求。add时将附加值。set时将覆盖值。
+            - matchExp: string check时，如不匹配将结束请求。replace时结合value进行替换
+            - value: string check时，如不匹配将结束请求。replace时结合matchExp进行替换。add时将附加值。set时将覆盖值。
