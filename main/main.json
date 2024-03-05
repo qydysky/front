@@ -6,8 +6,9 @@
     "routes": [
       {
         "path": "/",
+        "splicing": 100,
         "pathAdd": true,
-        "back": [
+        "backs": [
           {
             "name": "baidu1",
             "to": "s://www.baidu.com",
@@ -17,17 +18,11 @@
             "name": "baidu2",
             "to": "s://www.baidu.com",
             "weight": 1
-          }
-        ]
-      },
-      {
-        "path": "/s",
-        "pathAdd": true,
-        "back": [
+          },
           {
-            "name": "baidus",
+            "name": "baidu3",
             "to": "s://www.baidu.com",
-            "weight": 1
+            "weight": 0
           }
         ]
       }

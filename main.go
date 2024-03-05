@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 	_ "unsafe"
@@ -86,70 +87,6 @@ func Test(ctx context.Context, port int, logger Logger) {
 
 var cookie = fmt.Sprintf("%p", &struct{}{})
 
-// 转发
-func Run(ctx context.Context, configSP *Config, logger Logger) {
-	// 根ctx
-	ctx, cancle := pctx.WithWait(ctx, 0, time.Minute)
-	defer func() {
-		if errors.Is(cancle(), pctx.ErrWaitTo) {
-			logger.Error(`E:`, "退出超时")
-		}
-	}()
-
-	// 路由
-	routeP := pweb.WebPath{}
-
-	logger.Info(`I:`, "启动...")
-	defer logger.Info(`I:`, "退出,等待1min连接关闭...")
-
-	// config对象初次加载
-	if e := applyConfig(ctx, configSP, &routeP, logger); e != nil {
-		return
-	}
-
-	// matchfunc
-	var matchfunc func(path string) (func(w http.ResponseWriter, r *http.Request), bool)
-	switch configSP.MatchRule {
-	case "prefix":
-		logger.Info(`I:`, "匹配规则", "prefix")
-		matchfunc = routeP.LoadPerfix
-	case "all":
-		logger.Info(`I:`, "匹配规则", "all")
-		matchfunc = routeP.Load
-	default:
-		logger.Error(`E:`, "匹配规则", "无效")
-		return
-	}
-
-	httpSer := http.Server{
-		Addr: configSP.Addr,
-	}
-
-	if configSP.TLS.Config != nil {
-		httpSer.TLSConfig = configSP.TLS.Config.Clone()
-	}
-
-	if configSP.BlocksI == nil {
-		if configSP.CopyBlocks == 0 {
-			configSP.CopyBlocks = 1000
-		}
-		configSP.BlocksI = pslice.NewBlocks[byte](16*1024, configSP.CopyBlocks)
-	}
-
-	syncWeb := pweb.NewSyncMap(&httpSer, &routeP, matchfunc)
-	defer syncWeb.Shutdown()
-
-	// 定时加载config
-	for {
-		select {
-		case <-time.After(time.Second * 5):
-			_ = applyConfig(ctx, configSP, &routeP, logger)
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
 func loadConfig(buf []byte, configF File, configS *[]Config) error {
 	if i, e := configF.Read(buf); e != nil && !errors.Is(e, io.EOF) {
 		return e
@@ -163,102 +100,12 @@ func loadConfig(buf []byte, configF File, configS *[]Config) error {
 		if e := json.Unmarshal(buf[:i], configS); e != nil {
 			return e
 		}
-		for i := 0; i < len((*configS)); i++ {
-			if (*configS)[i].TLS.Config == nil && (*configS)[i].TLS.Key != "" && (*configS)[i].TLS.Pub != "" {
-				if cert, e := tls.LoadX509KeyPair((*configS)[i].TLS.Pub, (*configS)[i].TLS.Key); e != nil {
-					return e
-				} else {
-					(*configS)[i].TLS.Config = &tls.Config{
-						Certificates: []tls.Certificate{cert},
-						NextProtos:   []string{"h2", "http/1.1"},
-					}
-				}
-			}
-		}
 	}
 	return nil
 }
 
 //go:linkname nanotime1 runtime.nanotime1
 func nanotime1() int64
-
-func applyConfig(ctx context.Context, configS *Config, routeP *pweb.WebPath, logger Logger) error {
-	configS.lock.RLock()
-	defer configS.lock.RUnlock()
-
-	for _, v := range configS.SwapSign() {
-		logger.Info(`I:`, "路由移除", v.Path)
-		routeP.Store(v.Path, nil)
-		v.Sign = ""
-	}
-
-	for i := 0; i < len(configS.Routes); i++ {
-		route := &configS.Routes[i]
-		path := route.Path
-
-		if !route.SwapSign() {
-			continue
-		}
-
-		if len(route.Back) == 0 {
-			logger.Info(`I:`, "路由移除", path)
-			routeP.Store(path, nil)
-			continue
-		}
-
-		backArray := route.GenBack()
-
-		if len(backArray) == 0 {
-			logger.Info(`I:`, "路由移除", path)
-			routeP.Store(path, nil)
-			continue
-		}
-
-		backMap := make(map[string]*Back)
-
-		for i := 0; i < len(backArray); i++ {
-			backMap[backArray[i].Sign] = backArray[i]
-		}
-
-		logger.Info(`I:`, "路由更新", path)
-
-		routeP.Store(path, func(w http.ResponseWriter, r *http.Request) {
-			ctx1, done1 := pctx.WaitCtx(ctx)
-			defer done1()
-
-			var backIs []*Back
-			if validCookieDomain(r.Host) {
-				if t, e := r.Cookie("_psign_" + cookie); e == nil {
-					if tmp, ok := backMap[t.Value]; ok {
-						backIs = append(backIs, tmp)
-					}
-				}
-			}
-
-			if len(backIs) == 0 {
-				backIs = append(backIs, FiliterBackByRequest(backArray, r)...)
-			}
-
-			if len(backIs) == 0 {
-				w.WriteHeader(http.StatusServiceUnavailable)
-				logger.Error(`W:`, fmt.Sprintf("%s=> 无可用后端", path))
-				return
-			}
-
-			var e error
-			if r.Header.Get("Upgrade") == "websocket" {
-				e = wsDealer(ctx1, w, r, path, backIs, logger, configS.BlocksI)
-			} else {
-				e = httpDealer(ctx1, w, r, path, backIs, logger, configS.BlocksI)
-			}
-			if errors.Is(e, ErrHeaderCheckFail) {
-				w.WriteHeader(http.StatusForbidden)
-				return
-			}
-		})
-	}
-	return nil
-}
 
 var (
 	ErrRedirect        = errors.New("ErrRedirect")
@@ -328,13 +175,17 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 	logger.Debug(`T:`, fmt.Sprintf("http %s=>%s %v", routePath, chosenBack.Name, time.Since(opT)))
 
-	if validCookieDomain(r.Host) {
-		w.Header().Add("Set-Cookie", (&http.Cookie{
+	{
+		cookie := &http.Cookie{
 			Name:   "_psign_" + cookie,
-			Value:  chosenBack.Sign,
+			Value:  chosenBack.Id(),
 			MaxAge: chosenBack.Splicing,
-			Domain: r.Host,
-		}).String())
+			Path:   "/",
+		}
+		if validCookieDomain(r.Host) {
+			cookie.Domain = r.Host
+		}
+		w.Header().Add("Set-Cookie", (cookie).String())
 	}
 
 	w.Header().Add("_pto_"+cookie, chosenBack.Name)
@@ -409,13 +260,17 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 
 	logger.Debug(`T:`, fmt.Sprintf("ws %s=>%s %v", routePath, chosenBack.Name, time.Since(opT)))
 
-	if validCookieDomain(r.Host) {
-		w.Header().Add("Set-Cookie", (&http.Cookie{
+	{
+		cookie := &http.Cookie{
 			Name:   "_psign_" + cookie,
-			Value:  chosenBack.Sign,
+			Value:  chosenBack.Id(),
 			MaxAge: chosenBack.Splicing,
-			Domain: r.Host,
-		}).String())
+			Path:   "/",
+		}
+		if validCookieDomain(r.Host) {
+			cookie.Domain = r.Host
+		}
+		w.Header().Add("Set-Cookie", (cookie).String())
 	}
 
 	w.Header().Add("_pto_"+cookie, chosenBack.Name)
@@ -473,8 +328,12 @@ func copyHeader(s, t http.Header, app []Header) error {
 	for _, v := range app {
 		switch v.Action {
 		case `check`:
-			if val := tm[v.Key]; val[0] != v.Value {
+			if !MatchedOne(v, tm[v.Key][0]) {
 				return ErrHeaderCheckFail
+			}
+		case `replace`:
+			if va := t.Get(v.Key); va != "" {
+				t.Set(v.Key, regexp.MustCompile(v.MatchExp).ReplaceAllString(va, v.Value))
 			}
 		case `set`:
 			t.Set(v.Key, v.Value)
