@@ -116,6 +116,7 @@ var (
 	ErrReqDoFail       = errors.New("ErrReqDoFail")
 	ErrResDoFail       = errors.New("ErrResDoFail")
 	ErrHeaderCheckFail = errors.New("ErrHeaderCheckFail")
+	ErrBodyCheckFail   = errors.New("ErrBodyCheckFail")
 )
 
 func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, backs []*Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
@@ -136,7 +137,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 		url = "http" + url
 
-		for _, v := range chosenBack.ReqHeader {
+		for _, v := range chosenBack.tmp.ReqHeader {
 			if v.Action == `check` {
 				if r.Header.Get(v.Key) != v.Value {
 					return ErrHeaderCheckFail
@@ -144,12 +145,18 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 			}
 		}
 
-		req, e := http.NewRequestWithContext(ctx, r.Method, url, r.Body)
+		reader, e := BodyMatchs(chosenBack.tmp.ReqBody, r)
+		if e != nil {
+			logger.Warn(`W:`, fmt.Sprintf("%s=>%s %v", routePath, chosenBack.Name, ErrBodyCheckFail))
+			return errors.Join(ErrBodyCheckFail, e)
+		}
+
+		req, e := http.NewRequestWithContext(ctx, r.Method, url, reader)
 		if e != nil {
 			return errors.Join(ErrReqCreFail, e)
 		}
 
-		if e := copyHeader(r.Header, req.Header, chosenBack.ReqHeader); e != nil {
+		if e := copyHeader(r.Header, req.Header, chosenBack.tmp.ReqHeader); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf("%s=>%s %v", routePath, chosenBack.Name, e))
 			return e
 		}
@@ -190,7 +197,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 	w.Header().Add("_pto_"+cookie, chosenBack.Name)
 
-	if e := copyHeader(resp.Header, w.Header(), chosenBack.ResHeader); e != nil {
+	if e := copyHeader(resp.Header, w.Header(), chosenBack.tmp.ResHeader); e != nil {
 		logger.Warn(`W:`, fmt.Sprintf("%s=>%s %v", routePath, chosenBack.Name, e))
 		return e
 	}
@@ -229,6 +236,12 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		chosenBack = backs[0]
 		backs = backs[1:]
 
+		_, e := BodyMatchs(chosenBack.tmp.ReqBody, r)
+		if e != nil {
+			logger.Warn(`W:`, fmt.Sprintf("%s=>%s %v", routePath, chosenBack.Name, ErrBodyCheckFail))
+			return errors.Join(ErrBodyCheckFail, e)
+		}
+
 		url := chosenBack.To
 		if chosenBack.PathAdd {
 			url += r.URL.String()
@@ -238,12 +251,11 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 
 		reqHeader := make(http.Header)
 
-		if e := copyHeader(r.Header, reqHeader, chosenBack.ReqHeader); e != nil {
+		if e := copyHeader(r.Header, reqHeader, chosenBack.tmp.ReqHeader); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf("%s=>%s %v", routePath, chosenBack.Name, e))
 			return e
 		}
 
-		var e error
 		conn, resp, e = DialContext(ctx, url, reqHeader)
 		if e != nil {
 			chosenBack.Disable()
@@ -278,7 +290,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 	defer conn.Close()
 
 	resHeader := make(http.Header)
-	if e := copyHeader(resp.Header, resHeader, chosenBack.ResHeader); e != nil {
+	if e := copyHeader(resp.Header, resHeader, chosenBack.tmp.ResHeader); e != nil {
 		logger.Warn(`W:`, fmt.Sprintf("%s=>%s %v", routePath, chosenBack.Name, e))
 		return e
 	}
@@ -328,7 +340,7 @@ func copyHeader(s, t http.Header, app []Header) error {
 	for _, v := range app {
 		switch v.Action {
 		case `check`:
-			if !MatchedOne(v, tm[v.Key][0]) {
+			if !v.Match(tm[v.Key][0]) {
 				return ErrHeaderCheckFail
 			}
 		case `replace`:
