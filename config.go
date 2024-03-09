@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand/v2"
+	"net"
 	"net/http"
 	"regexp"
 	"sync"
@@ -31,6 +32,7 @@ type Config struct {
 	CopyBlocks int                  `json:"copyBlocks"`
 	BlocksI    pslice.BlocksI[byte] `json:"-"`
 
+	routeP   pweb.WebPath
 	routeMap sync.Map `json:"-"`
 	Routes   []Route  `json:"routes"`
 }
@@ -39,20 +41,21 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 	ctx, done := pctx.WithWait(ctx, 0, time.Minute)
 	defer done()
 
-	routeP := pweb.WebPath{}
-
 	var matchfunc func(path string) (func(w http.ResponseWriter, r *http.Request), bool)
 	switch t.MatchRule {
 	case "all":
-		matchfunc = routeP.Load
+		matchfunc = t.routeP.Load
 	default:
-		matchfunc = routeP.LoadPerfix
+		matchfunc = t.routeP.LoadPerfix
 	}
 
-	httpSer := http.Server{Addr: t.Addr}
+	httpSer := http.Server{
+		Addr:        t.Addr,
+		BaseContext: func(l net.Listener) context.Context { return ctx },
+	}
 	if t.TLS.Key != "" && t.TLS.Pub != "" {
 		if cert, e := tls.LoadX509KeyPair(t.TLS.Pub, t.TLS.Key); e != nil {
-			logger.Error(`E:`, e)
+			logger.Error(`E:`, fmt.Sprintf("%v %v", t.Addr, e))
 		} else {
 			httpSer.TLSConfig = &tls.Config{
 				Certificates: []tls.Certificate{cert},
@@ -67,24 +70,29 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 		t.BlocksI = pslice.NewBlocks[byte](16*1024, t.CopyBlocks)
 	}
 
-	syncWeb := pweb.NewSyncMap(&httpSer, &routeP, matchfunc)
+	syncWeb := pweb.NewSyncMap(&httpSer, &t.routeP, matchfunc)
 	defer syncWeb.Shutdown()
 
-	var addRoute = func(k string, route *Route) {
-		logger.Info(`I:`, "路由加载", k)
+	t.SwapSign(ctx, logger)
+	logger.Info(`I:`, fmt.Sprintf("%v running", t.Addr))
+	<-ctx.Done()
+	logger.Info(`I:`, fmt.Sprintf("%v shutdown", t.Addr))
+}
+
+func (t *Config) SwapSign(ctx context.Context, logger Logger) {
+	var add = func(k string, route *Route, logger Logger) {
+		route.config = t
+		logger.Info(`I:`, fmt.Sprintf("%v > %v", t.Addr, k))
 		t.routeMap.Store(k, route)
 
-		routeP.Store(route.Path, func(w http.ResponseWriter, r *http.Request) {
-			ctx1, done1 := pctx.WaitCtx(ctx)
-			defer done1()
-
-			if !HeaderMatchs(route.MatchHeader, r) {
+		t.routeP.Store(route.Path, func(w http.ResponseWriter, r *http.Request) {
+			if !HeaderMatchs(route.ReqHeader, r) {
 				w.WriteHeader(http.StatusNotFound)
 			}
 
 			var backIs []*Back
 			if t, e := r.Cookie("_psign_" + cookie); e == nil {
-				if backP, ok := route.backMap.Load(t.Value); ok && backP.(*Back).IsLive() && HeaderMatchs(backP.(*Back).MatchHeader, r) {
+				if backP, ok := route.backMap.Load(t.Value); ok && backP.(*Back).IsLive() && HeaderMatchs(backP.(*Back).ReqHeader, r) {
 					backP.(*Back).PathAdd = route.PathAdd
 					backP.(*Back).Splicing = route.Splicing
 					backP.(*Back).tmp.ReqHeader = append(route.ReqHeader, backP.(*Back).ReqHeader...)
@@ -105,9 +113,12 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 
 			var e error
 			if r.Header.Get("Upgrade") == "websocket" {
-				e = wsDealer(ctx1, w, r, route.Path, backIs, logger, t.BlocksI)
+				e = wsDealer(r.Context(), w, r, route.Path, backIs, logger, t.BlocksI)
 			} else {
-				e = httpDealer(ctx1, w, r, route.Path, backIs, logger, t.BlocksI)
+				e = httpDealer(r.Context(), w, r, route.Path, backIs, logger, t.BlocksI)
+			}
+			if e != nil {
+				w.Header().Add(header+"Error", e.Error())
 			}
 			if errors.Is(e, ErrHeaderCheckFail) || errors.Is(e, ErrBodyCheckFail) {
 				w.WriteHeader(http.StatusForbidden)
@@ -116,25 +127,27 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 		})
 	}
 
-	var delRoute = func(k string, route *Route) {
-		logger.Info(`I:`, "路由移除", k)
+	var del = func(k string, route *Route, logger Logger) {
+		logger.Info(`I:`, fmt.Sprintf("%v x %v", t.Addr, k))
 		t.routeMap.Delete(k)
-		routeP.Store(k, nil)
+		t.routeP.Store(k, nil)
 	}
 
-	t.SwapSign(addRoute, delRoute, logger)
-	logger.Info(`I:`, "启动完成")
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(time.Second * 10):
-			t.SwapSign(addRoute, delRoute, logger)
-		}
+	var routeU = func(route *Route, logger Logger) {
+		route.SwapSign(
+			func(k string, b *Back) {
+				b.route = route
+				logger.Info(`I:`, fmt.Sprintf("%v > %v > %v", t.Addr, route.Path, b.Name))
+				route.backMap.Store(k, b)
+			},
+			func(k string, b *Back) {
+				logger.Info(`I:`, fmt.Sprintf("%v > %v x %v", t.Addr, route.Path, b.Name))
+				route.backMap.Delete(k)
+			},
+			logger,
+		)
 	}
-}
 
-func (t *Config) SwapSign(add func(string, *Route), del func(string, *Route), logger Logger) {
 	t.routeMap.Range(func(key, value any) bool {
 		var exist bool
 		for k := 0; k < len(t.Routes); k++ {
@@ -144,34 +157,22 @@ func (t *Config) SwapSign(add func(string, *Route), del func(string, *Route), lo
 			}
 		}
 		if !exist {
-			del(key.(string), value.(*Route))
+			del(key.(string), value.(*Route), logger)
 		}
 		return true
 	})
 
 	for i := 0; i < len(t.Routes); i++ {
 		if _, ok := t.routeMap.Load(t.Routes[i].Path); !ok {
-			add(t.Routes[i].Path, &t.Routes[i])
+			routeU(&t.Routes[i], logger)
+			add(t.Routes[i].Path, &t.Routes[i], logger)
 		}
-	}
-
-	for i := 0; i < len(t.Routes); i++ {
-		t.Routes[i].SwapSign(
-			func(k string, b *Back) {
-				logger.Info(`I:`, "后端加载", t.Routes[i].Path, b.Name)
-				t.Routes[i].backMap.Store(k, b)
-			},
-			func(k string, b *Back) {
-				logger.Info(`I:`, "后端移除", t.Routes[i].Path, b.Name)
-				t.Routes[i].backMap.Delete(k)
-			},
-			logger,
-		)
 	}
 }
 
 type Route struct {
-	Path string `json:"path"`
+	config *Config `json:"-"`
+	Path   string  `json:"path"`
 
 	Splicing int  `json:"splicing"`
 	PathAdd  bool `json:"pathAdd"`
@@ -237,7 +238,7 @@ func (t *Route) SwapSign(add func(string, *Back), del func(string, *Back), logge
 func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var backLink []*Back
 	for i := 0; i < len(t.Backs); i++ {
-		if t.Backs[i].IsLive() && HeaderMatchs(t.Backs[i].MatchHeader, r) {
+		if t.Backs[i].IsLive() && HeaderMatchs(t.Backs[i].ReqHeader, r) {
 			t.Backs[i].PathAdd = t.PathAdd
 			t.Backs[i].Splicing = t.Splicing
 			t.Backs[i].tmp.ReqHeader = append(t.ReqHeader, t.Backs[i].ReqHeader...)
@@ -255,8 +256,9 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 }
 
 type Back struct {
-	lock sync.RWMutex `json:"-"`
-	upT  time.Time    `json:"-"`
+	route *Route       `json:"-"`
+	lock  sync.RWMutex `json:"-"`
+	upT   time.Time    `json:"-"`
 
 	Name      string `json:"name"`
 	To        string `json:"to"`
@@ -310,10 +312,9 @@ func (t *Back) Disable() {
 }
 
 type Matcher struct {
-	MatchHeader []Header `json:"matchHeader"`
-	ReqHeader   []Header `json:"reqHeader"`
-	ResHeader   []Header `json:"resHeader"`
-	ReqBody     []Body   `json:"reqBody"`
+	ReqHeader []Header `json:"reqHeader"`
+	ResHeader []Header `json:"resHeader"`
+	ReqBody   []Body   `json:"reqBody"`
 }
 
 type Header struct {
@@ -324,15 +325,15 @@ type Header struct {
 }
 
 func (t *Header) Match(value string) bool {
-	if t.Value != "" && value != t.Value {
-		return false
+	if t.Action != "access" && t.Action != "deny" {
+		return true
 	}
 	if t.MatchExp != "" {
 		if exp, e := regexp.Compile(t.MatchExp); e != nil || !exp.MatchString(value) {
-			return false
+			return t.Action == "deny"
 		}
 	}
-	return true
+	return t.Action == "access"
 }
 
 type Body struct {

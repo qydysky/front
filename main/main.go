@@ -74,7 +74,7 @@ func main() {
 	go pfront.Test(ctx, *testP, logger.Base("测试"))
 
 	for i := 0; i < len(configS); i++ {
-		go configS[i].Run(ctx, logger.Base(configS[i].Addr))
+		go configS[i].Run(ctx, logger)
 	}
 
 	// ctrl+c退出

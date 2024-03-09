@@ -36,21 +36,17 @@ config:
 
 matcher:
 
-- matchHeader: [] 匹配客户端请求头，只有都匹配才使用此后端, 可以动态增加/删除
-    - key: string 要匹配的header名
-    - matchExp: string 要匹配的正则式
-    - value: string 要匹配的值
 - reqHeader: [] 请求后端前，请求头处理器, 可以动态增加/删除
-    - action: string 可选check、replace、add、del、set。
+    - action: string 可选access、deny、replace、add、del、set。
     - key: string 具体处理哪个头
-    - matchExp: string check时，如不匹配将结束请求。replace时结合value进行替换
-    - value: string check时，如不匹配将结束请求。replace时结合matchExp进行替换。add时将附加值。set时将覆盖值。
+    - matchExp: string access时不匹配将结束请求。deny时匹配将结束请求。replace时结合value进行替换
+    - value: string replace时结合matchExp进行替换。add时将附加值。set时将覆盖值。
 - resHeader: [] 返回后端的响应前，请求头处理器, 可以动态增加/删除
-    - action: string 可选check、add、del、set。
+    - action: string 可选access、deny、add、del、set。
     - key: string 具体处理哪个头
-    - matchExp: string check时，如不匹配将结束请求。replace时结合value进行替换
-    - value: string check时，如不匹配将结束请求。replace时结合matchExp进行替换。add时将附加值。set时将覆盖值。
+    - matchExp: string access时不匹配将结束请求。deny时匹配将结束请求。replace时结合value进行替换
+    - value: string replace时结合matchExp进行替换。add时将附加值。set时将覆盖值。
 - reqBody: [] 请求后端前，请求数据过滤器, 可以动态增加/删除
-    - action: string 可选access,deny。
+    - action: string 可选access、deny。
     - reqSize：string 限定请求数据大小，默认为"1M"
     - matchExp: string access时如不匹配将结束请求。deny时如匹配将结束请求。
