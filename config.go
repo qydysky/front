@@ -93,11 +93,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 			var backIs []*Back
 			if t, e := r.Cookie("_psign_" + cookie); e == nil {
 				if backP, ok := route.backMap.Load(t.Value); ok && backP.(*Back).IsLive() && HeaderMatchs(backP.(*Back).ReqHeader, r) {
-					backP.(*Back).PathAdd = route.PathAdd
-					backP.(*Back).Splicing = route.Splicing
-					backP.(*Back).tmp.ReqHeader = append(route.ReqHeader, backP.(*Back).ReqHeader...)
-					backP.(*Back).tmp.ResHeader = append(route.ResHeader, backP.(*Back).ResHeader...)
-					backP.(*Back).tmp.ReqBody = append(route.ReqBody, backP.(*Back).ReqBody...)
+					backP.(*Back).cloneDealer()
 					for i := 0; i < backP.(*Back).Weight; i++ {
 						backIs = append(backIs, backP.(*Back))
 					}
@@ -176,7 +172,7 @@ type Route struct {
 
 	Splicing int  `json:"splicing"`
 	PathAdd  bool `json:"pathAdd"`
-	Matcher
+	Dealer
 
 	backMap sync.Map `json:"-"`
 	Backs   []Back   `json:"backs"`
@@ -208,42 +204,11 @@ func (t *Route) SwapSign(add func(string, *Back), del func(string, *Back), logge
 	}
 }
 
-// func (t *Route) GenBack() []*Back {
-// 	var backLink []*Back
-// 	for i := 0; i < len(t.Back); i++ {
-// 		back := &t.Back[i]
-// 		back.SwapSign()
-// 		if back.Weight == 0 {
-// 			continue
-// 		}
-// 		tmpBack := Back{
-// 			Name:        back.Name,
-// 			Splicing:    t.Splicing,
-// 			Sign:        back.Sign,
-// 			To:          back.To,
-// 			Weight:      back.Weight,
-// 			ErrBanSec:   back.ErrBanSec,
-// 			PathAdd:     t.PathAdd,
-// 			MatchHeader: append(t.MatchHeader, back.MatchHeader...),
-// 			ReqHeader:   append(t.ReqHeader, back.ReqHeader...),
-// 			ResHeader:   append(t.ResHeader, back.ResHeader...),
-// 		}
-// 		for i := 1; i <= back.Weight; i++ {
-// 			backLink = append(backLink, &tmpBack)
-// 		}
-// 	}
-// 	return backLink
-// }
-
 func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var backLink []*Back
 	for i := 0; i < len(t.Backs); i++ {
 		if t.Backs[i].IsLive() && HeaderMatchs(t.Backs[i].ReqHeader, r) {
-			t.Backs[i].PathAdd = t.PathAdd
-			t.Backs[i].Splicing = t.Splicing
-			t.Backs[i].tmp.ReqHeader = append(t.ReqHeader, t.Backs[i].ReqHeader...)
-			t.Backs[i].tmp.ResHeader = append(t.ResHeader, t.Backs[i].ResHeader...)
-			t.Backs[i].tmp.ReqBody = append(t.ReqBody, t.Backs[i].ReqBody...)
+			t.Backs[i].cloneDealer()
 			for k := 0; k < t.Backs[i].Weight; k++ {
 				backLink = append(backLink, &t.Backs[i])
 			}
@@ -260,15 +225,30 @@ type Back struct {
 	lock  sync.RWMutex `json:"-"`
 	upT   time.Time    `json:"-"`
 
-	Name      string `json:"name"`
-	To        string `json:"to"`
-	Weight    int    `json:"weight"`
-	ErrBanSec int    `json:"errBanSec"`
+	Name   string `json:"name"`
+	To     string `json:"to"`
+	Weight int    `json:"weight"`
 
 	Splicing int  `json:"-"`
 	PathAdd  bool `json:"-"`
-	Matcher
-	tmp Matcher `json:"-"`
+	Dealer
+	tmp Dealer `json:"-"`
+}
+
+func (t *Back) cloneDealer() {
+	t.PathAdd = t.route.PathAdd
+	if t.route.Splicing != 0 {
+		t.Splicing = t.route.Splicing
+	}
+	if t.route.ErrBanSec != 0 {
+		t.ErrBanSec = t.route.ErrBanSec
+	}
+	if t.route.ErrToSec != 0 {
+		t.ErrToSec = t.route.ErrToSec
+	}
+	t.tmp.ReqHeader = append(t.route.ReqHeader, t.ReqHeader...)
+	t.tmp.ResHeader = append(t.route.ResHeader, t.ResHeader...)
+	t.tmp.ReqBody = append(t.route.ReqBody, t.ReqBody...)
 }
 
 func (t *Back) Id() string {
@@ -311,7 +291,9 @@ func (t *Back) Disable() {
 	t.upT = time.Now().Add(time.Second * time.Duration(t.ErrBanSec))
 }
 
-type Matcher struct {
+type Dealer struct {
+	ErrToSec  int      `json:"errToSec"`
+	ErrBanSec int      `json:"errBanSec"`
 	ReqHeader []Header `json:"reqHeader"`
 	ResHeader []Header `json:"resHeader"`
 	ReqBody   []Body   `json:"reqBody"`

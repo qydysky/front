@@ -26,16 +26,17 @@ config:
     - path: string 路径
     - splicing: int 当客户端支持cookie时，将会固定使用后端多少秒
     - pathAdd: bool 将客户端访问的路径附加在path上 例：/api/req => /ws => /ws/api/req
-    - matcher 将会附加到每个backs前
+    - dealer 将会附加到每个backs前
     - backs: [] 后端, 可以动态增加/删除
         - name: string 后端名称，将在日志中显示
         - to: string 后端地址，例"s://www.baidu.com"，会根据客户端自动添加http or ws在地址前
         - weight: int 权重，按routes中的全部back的权重比分配，当权重变为0时，将停止新请求的进入
-        - errBanSec: int 当后端错误时（指连接失败，不指后端错误响应），将会禁用若干秒
-        - matcher
+        - dealer
 
-matcher:
+dealer:
 
+- errToSec: int 当后端响应超过(ws则指初次返回时间)指定秒，将会触发errBanSec
+- errBanSec: int 当后端错误时（指连接失败，不指后端错误响应），将会禁用若干秒
 - reqHeader: [] 请求后端前，请求头处理器, 可以动态增加/删除
     - action: string 可选access、deny、replace、add、del、set。
     - key: string 具体处理哪个头
