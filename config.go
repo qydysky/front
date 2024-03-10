@@ -292,7 +292,7 @@ func (t *Back) Disable() {
 }
 
 type Dealer struct {
-	ErrToSec  int      `json:"errToSec"`
+	ErrToSec  float64  `json:"errToSec"`
 	ErrBanSec int      `json:"errBanSec"`
 	ReqHeader []Header `json:"reqHeader"`
 	ResHeader []Header `json:"resHeader"`

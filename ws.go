@@ -67,7 +67,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		return errors.New("后端故障")
 	}
 
-	if chosenBack.ErrToSec != 0 && time.Since(opT).Seconds() > float64(chosenBack.ErrToSec) {
+	if chosenBack.ErrToSec != 0 && time.Since(opT).Seconds() > chosenBack.ErrToSec {
 		logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws 超时响应 %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
 		chosenBack.Disable()
 	} else {
