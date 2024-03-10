@@ -134,22 +134,22 @@ func copyHeader(s, t http.Header, app []Header) error {
 	for _, v := range app {
 		switch v.Action {
 		case `deny`:
-			if va, ok := tm[v.Key]; ok && len(va) != 0 {
-				if exp, e := regexp.Compile(v.MatchExp); e == nil && exp.MatchString(va[0]) {
+			if va := t.Get(v.Key); va != "" {
+				if exp, e := regexp.Compile(v.MatchExp); e == nil && exp.MatchString(va) {
 					return ErrHeaderCheckFail
 				}
 			}
 		case `access`:
-			if va, ok := tm[v.Key]; ok && len(va) != 0 {
-				if exp, e := regexp.Compile(v.MatchExp); e != nil || !exp.MatchString(va[0]) {
+			if va := t.Get(v.Key); va != "" {
+				if exp, e := regexp.Compile(v.MatchExp); e != nil || !exp.MatchString(va) {
 					return ErrHeaderCheckFail
 				}
 			} else {
 				return ErrHeaderCheckFail
 			}
 		case `replace`:
-			if va, ok := tm[v.Key]; ok && len(va) != 0 {
-				tm[v.Key][0] = regexp.MustCompile(v.MatchExp).ReplaceAllString(va[0], v.Value)
+			if va := t.Get(v.Key); va != "" {
+				t.Set(v.Key, regexp.MustCompile(v.MatchExp).ReplaceAllString(va, v.Value))
 			}
 		case `set`:
 			t.Set(v.Key, v.Value)
