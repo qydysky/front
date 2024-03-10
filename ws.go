@@ -33,6 +33,10 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		chosenBack = backs[0]
 		backs = backs[1:]
 
+		if !chosenBack.IsLive() {
+			continue
+		}
+
 		_, e := BodyMatchs(chosenBack.tmp.ReqBody, r)
 		if e != nil {
 			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
@@ -41,7 +45,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 
 		url := chosenBack.To
 		if chosenBack.PathAdd {
-			url += r.URL.String()
+			url += r.URL.RequestURI()
 		}
 
 		url = "ws" + url
@@ -61,11 +65,9 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		}
 	}
 
-	if 0 == len(backs) && (resp == nil || conn == nil) {
+	if resp == nil || conn == nil {
 		logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrAllBacksFail, time.Since(opT)))
 		return ErrAllBacksFail
-	} else if resp == nil || conn == nil {
-		return ErrBacksFail
 	}
 
 	if chosenBack.ErrToSec != 0 && time.Since(opT).Seconds() > chosenBack.ErrToSec {

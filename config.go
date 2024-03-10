@@ -92,8 +92,9 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 			}
 
 			var backIs []*Back
+
 			if t, e := r.Cookie("_psign_" + cookie); e == nil {
-				if backP, ok := route.backMap.Load(t.Value); ok && backP.(*Back).IsLive() && HeaderMatchs(backP.(*Back).ReqHeader, r) {
+				if backP, ok := route.backMap.Load(t.Value); ok && HeaderMatchs(backP.(*Back).ReqHeader, r) {
 					backP.(*Back).cloneDealer()
 					for i := 0; i < backP.(*Back).Weight; i++ {
 						backIs = append(backIs, backP.(*Back))
@@ -104,9 +105,9 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 			backIs = append(backIs, route.FiliterBackByRequest(r)...)
 
 			if len(backIs) == 0 {
-				logger.Warn(`W:`, fmt.Sprintf("%v > %v %v", route.config.Addr, route.Path, ErrAllBacksFail))
-				w.Header().Add(header+"Error", ErrAllBacksFail.Error())
-				w.WriteHeader(http.StatusServiceUnavailable)
+				logger.Warn(`W:`, fmt.Sprintf("%v > %v %v %v", route.config.Addr, route.Path, r.URL.RequestURI(), ErrNoRoute))
+				w.Header().Add(header+"Error", ErrNoRoute.Error())
+				w.WriteHeader(http.StatusNotFound)
 				return
 			}
 
@@ -211,7 +212,7 @@ func (t *Route) SwapSign(add func(string, *Back), del func(string, *Back), logge
 func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var backLink []*Back
 	for i := 0; i < len(t.Backs); i++ {
-		if t.Backs[i].IsLive() && HeaderMatchs(t.Backs[i].ReqHeader, r) {
+		if HeaderMatchs(t.Backs[i].ReqHeader, r) {
 			t.Backs[i].cloneDealer()
 			for k := 0; k < t.Backs[i].Weight; k++ {
 				backLink = append(backLink, &t.Backs[i])

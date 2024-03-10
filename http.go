@@ -24,9 +24,13 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 		chosenBack = backs[0]
 		backs = backs[1:]
 
+		if !chosenBack.IsLive() {
+			continue
+		}
+
 		url := chosenBack.To
 		if chosenBack.PathAdd {
-			url += r.URL.String()
+			url += r.URL.RequestURI()
 		}
 
 		url = "http" + url
@@ -59,11 +63,9 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 		}
 	}
 
-	if 0 == len(backs) && resp == nil {
+	if resp == nil {
 		logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v http %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrAllBacksFail, time.Since(opT)))
 		return ErrAllBacksFail
-	} else if resp == nil {
-		return ErrBacksFail
 	}
 
 	if chosenBack.ErrToSec != 0 && time.Since(opT).Seconds() > chosenBack.ErrToSec {
