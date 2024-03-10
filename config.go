@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -103,22 +104,25 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 			backIs = append(backIs, route.FiliterBackByRequest(r)...)
 
 			if len(backIs) == 0 {
-				w.WriteHeader(http.StatusNotFound)
+				logger.Warn(`W:`, fmt.Sprintf("%v > %v %v", route.config.Addr, route.Path, ErrAllBacksFail))
+				w.Header().Add(header+"Error", ErrAllBacksFail.Error())
+				w.WriteHeader(http.StatusServiceUnavailable)
 				return
 			}
 
 			var e error
-			if r.Header.Get("Upgrade") == "websocket" {
+			if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
 				e = wsDealer(r.Context(), w, r, route.Path, backIs, logger, t.BlocksI)
 			} else {
 				e = httpDealer(r.Context(), w, r, route.Path, backIs, logger, t.BlocksI)
 			}
 			if e != nil {
 				w.Header().Add(header+"Error", e.Error())
-			}
-			if errors.Is(e, ErrHeaderCheckFail) || errors.Is(e, ErrBodyCheckFail) {
-				w.WriteHeader(http.StatusForbidden)
-				return
+				if errors.Is(e, ErrHeaderCheckFail) || errors.Is(e, ErrBodyCheckFail) {
+					w.WriteHeader(http.StatusForbidden)
+				} else {
+					t.routeP.GetConn(r).Close()
+				}
 			}
 		})
 	}

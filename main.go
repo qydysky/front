@@ -118,6 +118,9 @@ func copyHeader(s, t http.Header, app []Header) error {
 	sm := (map[string][]string)(s)
 	tm := (map[string][]string)(t)
 	for k, v := range sm {
+		if strings.ToLower(k) == "origin" {
+			continue
+		}
 		if strings.ToLower(k) == "set-cookie" {
 			cookies := strings.Split(v[0], ";")
 			for k, v := range cookies {
@@ -175,4 +178,6 @@ var (
 	ErrResDoFail       = errors.New("ErrResDoFail")
 	ErrHeaderCheckFail = errors.New("ErrHeaderCheckFail")
 	ErrBodyCheckFail   = errors.New("ErrBodyCheckFail")
+	ErrAllBacksFail    = errors.New("ErrAllBacksFail")
+	ErrBacksFail       = errors.New("ErrBacksFail")
 )

@@ -60,10 +60,10 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 	}
 
 	if 0 == len(backs) && resp == nil {
-		logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v http 全部后端故障 %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
-		return errors.New("全部后端故障")
+		logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v http %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrAllBacksFail, time.Since(opT)))
+		return ErrAllBacksFail
 	} else if resp == nil {
-		return errors.New("后端故障")
+		return ErrBacksFail
 	}
 
 	if chosenBack.ErrToSec != 0 && time.Since(opT).Seconds() > chosenBack.ErrToSec {
