@@ -17,6 +17,7 @@ import (
 	_ "unsafe"
 
 	"github.com/gorilla/websocket"
+	pctx "github.com/qydysky/part/ctx"
 	pslice "github.com/qydysky/part/slice"
 	"golang.org/x/net/proxy"
 )
@@ -79,9 +80,18 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		return ErrAllBacksFail
 	}
 
+	if pctx.Done(r.Context()) {
+		return context.Canceled
+	}
+
 	logger.Debug(`T:`, fmt.Sprintf("%v > %v > %v ws ok %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
 
-	{
+	if chosenBack.route.RollRule != `` {
+		chosenBack.be(opT)
+		defer chosenBack.ed()
+	}
+
+	if chosenBack.Splicing != 0 {
 		cookie := &http.Cookie{
 			Name:   "_psign_" + cookie,
 			Value:  chosenBack.Id(),
@@ -112,13 +122,17 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		select {
 		case e := <-copyWsMsg(req, conn, blocksi):
 			if e != nil {
-				chosenBack.Disable()
+				if !errors.Is(e, context.Canceled) {
+					chosenBack.Disable()
+				}
 				logger.Error(`E:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 				return errors.Join(ErrCopy, e)
 			}
 		case e := <-copyWsMsg(conn, req, blocksi):
 			if e != nil {
-				chosenBack.Disable()
+				if !errors.Is(e, context.Canceled) {
+					chosenBack.Disable()
+				}
 				logger.Error(`E:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 				return errors.Join(ErrCopy, e)
 			}

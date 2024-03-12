@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand/v2"
 	"net"
 	"net/http"
 	"regexp"
@@ -175,8 +174,8 @@ type Route struct {
 	config *Config `json:"-"`
 	Path   string  `json:"path"`
 
-	Splicing int  `json:"splicing"`
-	PathAdd  bool `json:"pathAdd"`
+	PathAdd  bool   `json:"pathAdd"`
+	RollRule string `json:"rollRule"`
 	Dealer
 
 	backMap sync.Map `json:"-"`
@@ -219,16 +218,25 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 			}
 		}
 	}
-	rand.Shuffle(len(backLink), func(i, j int) {
-		backLink[i], backLink[j] = backLink[j], backLink[i]
-	})
+
+	if f, ok := rollRuleMap[t.RollRule]; ok {
+		f(backLink)
+	} else {
+		rand_Shuffle(backLink)
+	}
+
 	return backLink
 }
 
 type Back struct {
-	route *Route       `json:"-"`
-	lock  sync.RWMutex `json:"-"`
-	upT   time.Time    `json:"-"`
+	route      *Route        `json:"-"`
+	lock       sync.RWMutex  `json:"-"`
+	upT        time.Time     `json:"-"`
+	disableC   int           `json:"-"`
+	dealingC   int           `json:"-"`
+	chosenC    int           `json:"-"`
+	lastResDru time.Duration `json:"-"`
+	resDru     time.Duration `json:"-"`
 
 	Name   string `json:"name"`
 	To     string `json:"to"`
@@ -281,6 +289,21 @@ func BodyMatchs(matchBody []Body, r *http.Request) (reader io.ReadCloser, e erro
 	return
 }
 
+func (t *Back) be(opT time.Time) {
+	t.lock.Lock()
+	t.chosenC += 1
+	t.lastResDru = time.Since(opT)
+	t.resDru += t.lastResDru
+	t.dealingC += 1
+	t.lock.Unlock()
+}
+
+func (t *Back) ed() {
+	t.lock.Lock()
+	t.dealingC -= 1
+	t.lock.Unlock()
+}
+
 func (t *Back) IsLive() bool {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
@@ -293,11 +316,13 @@ func (t *Back) Disable() {
 	}
 	t.lock.Lock()
 	defer t.lock.Unlock()
+	t.disableC += 1
 	t.upT = time.Now().Add(time.Second * time.Duration(t.ErrBanSec))
 }
 
 type Dealer struct {
 	ErrToSec  float64  `json:"errToSec"`
+	Splicing  int      `json:"splicing"`
 	ErrBanSec int      `json:"errBanSec"`
 	ReqHeader []Header `json:"reqHeader"`
 	ResHeader []Header `json:"resHeader"`

@@ -75,7 +75,14 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 		return ErrAllBacksFail
 	}
 
-	{
+	logger.Debug(`T:`, fmt.Sprintf("%v > %v > %v http ok %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
+
+	if chosenBack.route.RollRule != `` {
+		chosenBack.be(opT)
+		defer chosenBack.ed()
+	}
+
+	if chosenBack.Splicing != 0 {
 		cookie := &http.Cookie{
 			Name:   "_psign_" + cookie,
 			Value:  chosenBack.Id(),
@@ -110,7 +117,9 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 		defer put()
 		if _, e = io.CopyBuffer(w, resp.Body, tmpbuf); e != nil {
 			logger.Error(`E:`, fmt.Sprintf("%v > %v > %v http %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-			chosenBack.Disable()
+			if !errors.Is(e, context.Canceled) {
+				chosenBack.Disable()
+			}
 			return errors.Join(ErrCopy, e)
 		}
 	}
