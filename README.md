@@ -35,7 +35,7 @@ config:
 
 dealer:
 
-- errToSec: int 当后端响应超过(ws则指初次返回时间)指定秒，将会触发errBanSec
+- errToSec: float64 当后端响应超过(ws则指初次返回时间)指定秒，将会触发errBanSec
 - errBanSec: int 当后端错误时（指连接失败，不指后端错误响应），将会禁用若干秒
 - reqHeader: [] 请求后端前，请求头处理器, 可以动态增加/删除
     - action: string 可选access、deny、replace、add、del、set。

@@ -179,5 +179,6 @@ var (
 	ErrHeaderCheckFail = errors.New("ErrHeaderCheckFail")
 	ErrBodyCheckFail   = errors.New("ErrBodyCheckFail")
 	ErrAllBacksFail    = errors.New("ErrAllBacksFail")
+	ErrBackFail        = errors.New("ErrBackFail")
 	ErrNoRoute         = errors.New("ErrNoRoute")
 )

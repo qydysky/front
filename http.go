@@ -58,21 +58,21 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 		}
 		resp, e = client.Do(req)
 		if e != nil && !errors.Is(e, ErrRedirect) && !errors.Is(e, context.Canceled) {
-			chosenBack.Disable()
 			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v http %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+			chosenBack.Disable()
+			resp = nil
+		}
+
+		if chosenBack.ErrToSec != 0 && time.Since(opT).Seconds() > chosenBack.ErrToSec {
+			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v http 超时响应 %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
+			chosenBack.Disable()
+			resp = nil
 		}
 	}
 
 	if resp == nil {
 		logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v http %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrAllBacksFail, time.Since(opT)))
 		return ErrAllBacksFail
-	}
-
-	if chosenBack.ErrToSec != 0 && time.Since(opT).Seconds() > chosenBack.ErrToSec {
-		logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v http 超时响应 %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
-		chosenBack.Disable()
-	} else {
-		logger.Debug(`T:`, fmt.Sprintf("%v > %v > %v http ok %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
 	}
 
 	{

@@ -59,23 +59,27 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 
 		conn, resp, e = DialContext(ctx, url, reqHeader)
 		if e != nil && !errors.Is(e, context.Canceled) {
-			chosenBack.Disable()
 			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+			chosenBack.Disable()
+			conn = nil
+			resp = nil
+		}
 
+		if chosenBack.ErrToSec != 0 && time.Since(opT).Seconds() > chosenBack.ErrToSec {
+			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws 超时响应 %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
+			chosenBack.Disable()
+			conn.Close()
+			conn = nil
+			resp = nil
 		}
 	}
 
 	if resp == nil || conn == nil {
-		logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrAllBacksFail, time.Since(opT)))
+		logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrBackFail, time.Since(opT)))
 		return ErrAllBacksFail
 	}
 
-	if chosenBack.ErrToSec != 0 && time.Since(opT).Seconds() > chosenBack.ErrToSec {
-		logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws 超时响应 %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
-		chosenBack.Disable()
-	} else {
-		logger.Debug(`T:`, fmt.Sprintf("%v > %v > %v ws ok %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
-	}
+	logger.Debug(`T:`, fmt.Sprintf("%v > %v > %v ws ok %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
 
 	{
 		cookie := &http.Cookie{
