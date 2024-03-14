@@ -30,20 +30,25 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 		url := chosenBack.To
 		if chosenBack.PathAdd {
-			url += r.URL.RequestURI()
+			url += r.RequestURI
 		}
 
 		url = "http" + url
 
+		if !PatherMatchs(chosenBack.ReqPather, r) {
+			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v http %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrPatherCheckFail, time.Since(opT)))
+			return ErrPatherCheckFail
+		}
+
 		reader, e := BodyMatchs(chosenBack.tmp.ReqBody, r)
 		if e != nil {
 			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v http %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-			return errors.Join(ErrBodyCheckFail, e)
+			return ErrBodyCheckFail
 		}
 
 		req, e := http.NewRequestWithContext(ctx, r.Method, url, reader)
 		if e != nil {
-			return errors.Join(ErrReqCreFail, e)
+			return ErrReqCreFail
 		}
 
 		if e := copyHeader(r.Header, req.Header, chosenBack.tmp.ReqHeader); e != nil {
@@ -112,7 +117,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 	if tmpbuf, put, e := blocksi.Get(); e != nil {
 		logger.Error(`E:`, fmt.Sprintf("%v > %v > %v http %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 		chosenBack.Disable()
-		return errors.Join(ErrCopy, e)
+		return ErrCopy
 	} else {
 		defer put()
 		if _, e = io.CopyBuffer(w, resp.Body, tmpbuf); e != nil {
@@ -120,7 +125,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 			if !errors.Is(e, context.Canceled) {
 				chosenBack.Disable()
 			}
-			return errors.Join(ErrCopy, e)
+			return ErrCopy
 		}
 	}
 	return nil

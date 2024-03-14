@@ -6,8 +6,14 @@
     "routes": [
       {
         "path": "/",
-        "splicing": 100,
         "pathAdd": true,
+        "rollRule": "resDur_MinFirst",
+        "reqPather": [
+          {
+            "action": "deny",
+            "matchExp": "(\\.\/|\/\\.|\/\/|\\|<|>|\\.sh|\\.cmd|\\.so|\\.exe|\\.bat|http|ftp)"
+          }
+        ],
         "backs": [
           {
             "name": "baidu1",
@@ -17,12 +23,12 @@
           {
             "name": "baidu2",
             "to": "s://www.baidu.com",
-            "weight": 1
+            "weight": 2
           },
           {
             "name": "baidu3",
             "to": "s://www.baidu.com",
-            "weight": 0
+            "weight": 1
           }
         ]
       }

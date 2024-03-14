@@ -86,8 +86,18 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 		t.routeMap.Store(k, route)
 
 		t.routeP.Store(route.Path, func(w http.ResponseWriter, r *http.Request) {
+			if !PatherMatchs(route.ReqPather, r) {
+				logger.Warn(`W:`, fmt.Sprintf("%v > %v %v %v", route.config.Addr, route.Path, r.RequestURI, ErrPatherCheckFail))
+				w.Header().Add(header+"Error", ErrPatherCheckFail.Error())
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+
 			if !HeaderMatchs(route.ReqHeader, r) {
-				w.WriteHeader(http.StatusNotFound)
+				logger.Warn(`W:`, fmt.Sprintf("%v > %v %v %v", route.config.Addr, route.Path, r.RequestURI, ErrHeaderCheckFail))
+				w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
+				w.WriteHeader(http.StatusForbidden)
+				return
 			}
 
 			var backIs []*Back
@@ -104,7 +114,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 			backIs = append(backIs, route.FiliterBackByRequest(r)...)
 
 			if len(backIs) == 0 {
-				logger.Warn(`W:`, fmt.Sprintf("%v > %v %v %v", route.config.Addr, route.Path, r.URL.RequestURI(), ErrNoRoute))
+				logger.Warn(`W:`, fmt.Sprintf("%v > %v %v %v", route.config.Addr, route.Path, r.RequestURI, ErrNoRoute))
 				w.Header().Add(header+"Error", ErrNoRoute.Error())
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -259,6 +269,7 @@ func (t *Back) cloneDealer() {
 	if t.route.ErrToSec != 0 {
 		t.ErrToSec = t.route.ErrToSec
 	}
+	t.tmp.ReqPather = append(t.route.ReqPather, t.ReqPather...)
 	t.tmp.ReqHeader = append(t.route.ReqHeader, t.ReqHeader...)
 	t.tmp.ResHeader = append(t.route.ResHeader, t.ResHeader...)
 	t.tmp.ReqBody = append(t.route.ReqBody, t.ReqBody...)
@@ -266,6 +277,16 @@ func (t *Back) cloneDealer() {
 
 func (t *Back) Id() string {
 	return fmt.Sprintf("%p", t)
+}
+
+func PatherMatchs(matchPath []Header, r *http.Request) bool {
+	matchs := len(matchPath) - 1
+	for ; matchs >= 0; matchs -= 1 {
+		if !matchPath[matchs].Match(r.RequestURI) {
+			break
+		}
+	}
+	return matchs == -1
 }
 
 func HeaderMatchs(matchHeader []Header, r *http.Request) bool {
@@ -324,6 +345,7 @@ type Dealer struct {
 	ErrToSec  float64  `json:"errToSec"`
 	Splicing  int      `json:"splicing"`
 	ErrBanSec int      `json:"errBanSec"`
+	ReqPather []Header `json:"reqPather"`
 	ReqHeader []Header `json:"reqHeader"`
 	ResHeader []Header `json:"resHeader"`
 	ReqBody   []Body   `json:"reqBody"`

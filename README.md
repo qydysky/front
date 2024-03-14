@@ -8,6 +8,7 @@
 - 故障转移
 - 自定义头
 - 多种轮询
+- 请求路径过滤
 - 请求头过滤
 - 请求数据过滤
 
@@ -45,6 +46,9 @@ dealer:
 - splicing: int 当客户端支持cookie时，将会固定使用后端多少秒，默认不启用
 - errToSec: float64 当后端响应超过(ws则指初次返回时间)指定秒，将会触发errBanSec
 - errBanSec: int 当后端错误时（指连接失败，不指后端错误响应），将会禁用若干秒
+- reqPather: [] 请求后端前，请求路径过滤器, 可以动态增加/删除
+    - action: string 可选`access`、`deny`。
+    - matchExp: string `access`时如不匹配将结束请求。`deny`时如匹配将结束请求。
 - reqHeader: [] 请求后端前，请求头处理器, 可以动态增加/删除
     - action: string 可选`access`、`deny`、`replace`、`add`、`del`、`set`。
     - key: string 具体处理哪个头
@@ -58,4 +62,4 @@ dealer:
 - reqBody: [] 请求后端前，请求数据过滤器, 可以动态增加/删除
     - action: string 可选`access`、`deny`。
     - reqSize：string 限定请求数据大小，默认为`1M`
-    - matchExp: string `access`时如不匹配将结束请求。d`eny`时如匹配将结束请求。
+    - matchExp: string `access`时如不匹配将结束请求。`deny`时如匹配将结束请求。

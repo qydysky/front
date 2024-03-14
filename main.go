@@ -176,6 +176,7 @@ var (
 	ErrReqCreFail      = errors.New("ErrReqCreFail")
 	ErrReqDoFail       = errors.New("ErrReqDoFail")
 	ErrResDoFail       = errors.New("ErrResDoFail")
+	ErrPatherCheckFail = errors.New("ErrPatherCheckFail")
 	ErrHeaderCheckFail = errors.New("ErrHeaderCheckFail")
 	ErrBodyCheckFail   = errors.New("ErrBodyCheckFail")
 	ErrAllBacksFail    = errors.New("ErrAllBacksFail")

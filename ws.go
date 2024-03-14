@@ -38,15 +38,20 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 			continue
 		}
 
+		if !PatherMatchs(chosenBack.ReqPather, r) {
+			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrPatherCheckFail, time.Since(opT)))
+			return ErrPatherCheckFail
+		}
+
 		_, e := BodyMatchs(chosenBack.tmp.ReqBody, r)
 		if e != nil {
 			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-			return errors.Join(ErrBodyCheckFail, e)
+			return ErrBodyCheckFail
 		}
 
 		url := chosenBack.To
 		if chosenBack.PathAdd {
-			url += r.URL.RequestURI()
+			url += r.RequestURI
 		}
 
 		url = "ws" + url
@@ -115,7 +120,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 	}
 
 	if req, e := Upgrade(w, r, resHeader); e != nil {
-		return errors.Join(ErrResDoFail, e)
+		return ErrResDoFail
 	} else {
 		defer req.Close()
 
@@ -126,7 +131,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 					chosenBack.Disable()
 				}
 				logger.Error(`E:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-				return errors.Join(ErrCopy, e)
+				return ErrCopy
 			}
 		case e := <-copyWsMsg(conn, req, blocksi):
 			if e != nil {
@@ -134,7 +139,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 					chosenBack.Disable()
 				}
 				logger.Error(`E:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-				return errors.Join(ErrCopy, e)
+				return ErrCopy
 			}
 		case <-ctx.Done():
 		}
