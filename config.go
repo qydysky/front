@@ -260,13 +260,13 @@ type Back struct {
 
 func (t *Back) cloneDealer() {
 	t.PathAdd = t.route.PathAdd
-	if t.route.Splicing != 0 {
+	if t.Splicing == 0 {
 		t.Splicing = t.route.Splicing
 	}
-	if t.route.ErrBanSec != 0 {
+	if t.ErrBanSec == 0 {
 		t.ErrBanSec = t.route.ErrBanSec
 	}
-	if t.route.ErrToSec != 0 {
+	if t.ErrToSec == 0 {
 		t.ErrToSec = t.route.ErrToSec
 	}
 	t.tmp.ReqPather = append(t.route.ReqPather, t.ReqPather...)
