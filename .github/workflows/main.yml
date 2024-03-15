@@ -123,3 +123,28 @@ jobs:
       with:
         name: macos_go${{ matrix.go }}.zip
         path: ./macos_go${{ matrix.go }}.zip
+        
+  build:
+    name: Build
+    needs: [mac-build,w-build,u-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go }}
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v4
+
+    - name: Set Release Name
+      run: |
+        echo "TIME=$(date +"%Y%m%d%H%M%S")" >> $GITHUB_ENV
+        echo "HASH=$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_ENV
+
+    - name: Upload a Release Asset
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v0.1.${{ env.TIME }}
