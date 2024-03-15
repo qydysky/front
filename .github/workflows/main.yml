@@ -17,27 +17,109 @@ on:
       - '**.sum'
 
 jobs:
-
-  build:
-    name: Build
+  u-build:
+    name: build_ubuntu_go${{ matrix.go }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    strategy:
+      matrix:
+        go: [ '1.22' ]
     steps:
-    - name: Set up Go 1.x
+    - name: Set up Go${{ matrix.go }}
       uses: actions/setup-go@v5
       with:
-        go-version: '1.21'
+        go-version: ${{ matrix.go }}
 
-    - name: Check out code into the Go module directory
+    - name: Check out code
       uses: actions/checkout@v4
-
-    - name: Set Release Name
-      run: |
-        echo "TIME=$(date +"%Y%m%d%H%M%S")" >> $GITHUB_ENV
-        echo "HASH=$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_ENV
-
-    - name: Upload a Release Asset
-      uses: softprops/action-gh-release@v1
       with:
-        tag_name: v0.1.${{ env.TIME }}
+        lfs: true
+
+    - name: Checkout LFS objects
+      run: git lfs checkout
+
+    - name: Build
+      run: |
+        cd main
+        go get .
+        CGO_ENABLED=0 go build -pgo=auto -v -buildmode=exe main.go
+      
+    - name: zip
+      run: zip -q -r ubuntu_go${{ matrix.go }}.zip main
+      
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ubuntu_go${{ matrix.go }}.zip
+        path: ./ubuntu_go${{ matrix.go }}.zip
+        
+  w-build:
+    name: build_windows_go${{ matrix.go }}
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        go: [ '1.22' ]
+    steps:
+    - name: Set up Go${{ matrix.go }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go }}
+
+    - name: Check out code
+      uses: actions/checkout@v4
+      with:
+        lfs: true
+
+    - name: Checkout LFS objects
+      run: git lfs checkout
+
+    - name: Build
+      run: |
+        cd main
+        go get .
+        set CGO_ENABLED=0
+        go build -pgo=auto -v -buildmode=exe main.go
+        
+    - name: zip
+      run: .\7za.exe a -r .\windows_go${{ matrix.go }}.zip ./main
+      
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows_go${{ matrix.go }}.zip
+        path: ./windows_go${{ matrix.go }}.zip
+       
+  mac-build:
+    name: build_macos_go${{ matrix.go }}
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        go: [ '1.22' ]
+    steps:
+    - name: Set up Go${{ matrix.go }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go }}
+
+    - name: Check out code
+      uses: actions/checkout@v4
+      with:
+        lfs: true
+
+    - name: Checkout LFS objects
+      run: git lfs checkout
+
+    - name: Build
+      run: |
+        cd main
+        go get .
+        set CGO_ENABLED=0
+        go build -pgo=auto -v -buildmode=exe main.go
+        
+    - name: zip
+      run: zip -q -r macos_go${{ matrix.go }}.zip main
+      
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos_go${{ matrix.go }}.zip
+        path: ./macos_go${{ matrix.go }}.zip
