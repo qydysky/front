@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -168,7 +167,6 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					w.WriteHeader(http.StatusForbidden)
 				} else if errors.Is(e, ErrAllBacksFail) {
 					w.WriteHeader(http.StatusBadGateway)
-					os.Exit(0)
 				} else {
 					t.routeP.GetConn(r).Close()
 				}
