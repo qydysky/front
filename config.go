@@ -1,22 +1,20 @@
 package front
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
-	"regexp"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/dustin/go-humanize"
+	"github.com/qydysky/front/dealer"
+	filiter "github.com/qydysky/front/filiter"
 	pctx "github.com/qydysky/part/ctx"
-	pio "github.com/qydysky/part/io"
 	pslice "github.com/qydysky/part/slice"
 	pweb "github.com/qydysky/part/web"
 )
@@ -39,7 +37,9 @@ type Config struct {
 
 func (t *Config) Run(ctx context.Context, logger Logger) {
 	ctx, done := pctx.WithWait(ctx, 0, time.Minute)
-	defer done()
+	defer func() {
+		_ = done()
+	}()
 
 	var matchfunc func(path string) (func(w http.ResponseWriter, r *http.Request), bool)
 	switch t.MatchRule {
@@ -85,17 +85,39 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 		logger.Info(`I:`, fmt.Sprintf("%v > %v", t.Addr, k))
 		t.routeMap.Store(k, route)
 
+		var logFormat = "%v%v %v %v"
+
 		t.routeP.Store(route.Path, func(w http.ResponseWriter, r *http.Request) {
-			if !PatherMatchs(route.ReqPather, r) {
-				logger.Warn(`W:`, fmt.Sprintf("%v > %v %v %v", route.config.Addr, route.Path, r.RequestURI, ErrPatherCheckFail))
+			if len(r.RequestURI) > 8000 {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "BLOCK", ErrUriTooLong))
+				w.Header().Add(header+"Error", ErrUriTooLong.Error())
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			if ok, e := route.Filiter.ReqUri.Match(r); e != nil {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "Err", e))
+			} else if !ok {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "BLOCK", ErrPatherCheckFail))
 				w.Header().Add(header+"Error", ErrPatherCheckFail.Error())
 				w.WriteHeader(http.StatusForbidden)
 				return
 			}
 
-			if !HeaderMatchs(route.ReqHeader, r) {
-				logger.Warn(`W:`, fmt.Sprintf("%v > %v %v %v", route.config.Addr, route.Path, r.RequestURI, ErrHeaderCheckFail))
+			if ok, e := route.Filiter.ReqHeader.Match(r.Header); e != nil {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "Err", e))
+			} else if !ok {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "BLOCK", ErrHeaderCheckFail))
 				w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+
+			if ok, e := route.ReqBody.Match(r); e != nil {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "Err", e))
+			} else if !ok {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "BLOCK", ErrBodyCheckFail))
+				w.Header().Add(header+"Error", ErrBodyCheckFail.Error())
 				w.WriteHeader(http.StatusForbidden)
 				return
 			}
@@ -103,10 +125,24 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 			var backIs []*Back
 
 			if t, e := r.Cookie("_psign_" + cookie); e == nil {
-				if backP, ok := route.backMap.Load(t.Value); ok && HeaderMatchs(backP.(*Back).ReqHeader, r) {
-					backP.(*Back).cloneDealer()
-					for i := 0; i < backP.(*Back).Weight; i++ {
-						backIs = append(backIs, backP.(*Back))
+				if backP, aok := route.backMap.Load(t.Value); aok {
+
+					if ok, e := backP.(*Back).getFiliterReqUri().Match(r); e != nil {
+						logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "Err", e))
+					} else if ok {
+						aok = false
+					}
+
+					if ok, e := backP.(*Back).getFiliterReqHeader().Match(r.Header); e != nil {
+						logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "Err", e))
+					} else if ok {
+						aok = false
+					}
+
+					if aok {
+						for i := 0; i < backP.(*Back).Weight; i++ {
+							backIs = append(backIs, backP.(*Back))
+						}
 					}
 				}
 			}
@@ -114,7 +150,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 			backIs = append(backIs, route.FiliterBackByRequest(r)...)
 
 			if len(backIs) == 0 {
-				logger.Warn(`W:`, fmt.Sprintf("%v > %v %v %v", route.config.Addr, route.Path, r.RequestURI, ErrNoRoute))
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "BLOCK", ErrNoRoute))
 				w.Header().Add(header+"Error", ErrNoRoute.Error())
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -130,6 +166,9 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 				w.Header().Add(header+"Error", e.Error())
 				if errors.Is(e, ErrHeaderCheckFail) || errors.Is(e, ErrBodyCheckFail) {
 					w.WriteHeader(http.StatusForbidden)
+				} else if errors.Is(e, ErrAllBacksFail) {
+					w.WriteHeader(http.StatusBadGateway)
+					os.Exit(0)
 				} else {
 					t.routeP.GetConn(r).Close()
 				}
@@ -137,7 +176,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 		})
 	}
 
-	var del = func(k string, route *Route, logger Logger) {
+	var del = func(k string, _ *Route, logger Logger) {
 		logger.Info(`I:`, fmt.Sprintf("%v x %v", t.Addr, k))
 		t.routeMap.Delete(k)
 		t.routeP.Store(k, nil)
@@ -184,9 +223,10 @@ type Route struct {
 	config *Config `json:"-"`
 	Path   string  `json:"path"`
 
-	PathAdd  bool   `json:"pathAdd"`
-	RollRule string `json:"rollRule"`
-	Dealer
+	PathAdd  bool         `json:"pathAdd"`
+	RollRule string       `json:"rollRule"`
+	ReqBody  filiter.Body `json:"reqBody"`
+	Setting
 
 	backMap sync.Map `json:"-"`
 	Backs   []Back   `json:"backs"`
@@ -221,8 +261,8 @@ func (t *Route) SwapSign(add func(string, *Back), del func(string, *Back), logge
 func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var backLink []*Back
 	for i := 0; i < len(t.Backs); i++ {
-		if HeaderMatchs(t.Backs[i].ReqHeader, r) {
-			t.Backs[i].cloneDealer()
+		if ok, e := t.Backs[i].getFiliterReqHeader().Match(r.Header); ok && e == nil {
+			t.Backs[i].route = t
 			for k := 0; k < t.Backs[i].Weight; k++ {
 				backLink = append(backLink, &t.Backs[i])
 			}
@@ -252,62 +292,53 @@ type Back struct {
 	To     string `json:"to"`
 	Weight int    `json:"weight"`
 
-	Splicing int  `json:"-"`
-	PathAdd  bool `json:"-"`
-	Dealer
-	tmp Dealer `json:"-"`
+	Setting
 }
 
-func (t *Back) cloneDealer() {
-	t.PathAdd = t.route.PathAdd
-	if t.Splicing == 0 {
-		t.Splicing = t.route.Splicing
-	}
+func (t *Back) Splicing() int {
+	return t.route.Splicing
+}
+func (t *Back) PathAdd() bool {
+	return t.route.PathAdd
+}
+func (t *Back) getErrBanSec() int {
 	if t.ErrBanSec == 0 {
-		t.ErrBanSec = t.route.ErrBanSec
+		return t.route.ErrBanSec
+	} else {
+		return t.ErrBanSec
 	}
+}
+func (t *Back) getErrToSec() float64 {
 	if t.ErrToSec == 0 {
-		t.ErrToSec = t.route.ErrToSec
+		return t.route.ErrToSec
+	} else {
+		return t.ErrToSec
 	}
-	t.tmp.ReqPather = append(t.route.ReqPather, t.ReqPather...)
-	t.tmp.ReqHeader = append(t.route.ReqHeader, t.ReqHeader...)
-	t.tmp.ResHeader = append(t.route.ResHeader, t.ResHeader...)
-	t.tmp.ReqBody = append(t.route.ReqBody, t.ReqBody...)
+}
+func (t *Back) getFiliterReqHeader() *filiter.Header {
+	if !t.Filiter.ReqHeader.Valid() {
+		return &t.route.Filiter.ReqHeader
+	} else {
+		return &t.Filiter.ReqHeader
+	}
+}
+func (t *Back) getFiliterReqUri() *filiter.Uri {
+	if !t.Filiter.ReqUri.Valid() {
+		return &t.route.Filiter.ReqUri
+	} else {
+		return &t.Filiter.ReqUri
+	}
+}
+func (t *Back) getFiliterResHeader() *filiter.Header {
+	if !t.Filiter.ResHeader.Valid() {
+		return &t.route.Filiter.ResHeader
+	} else {
+		return &t.Filiter.ResHeader
+	}
 }
 
 func (t *Back) Id() string {
 	return fmt.Sprintf("%p", t)
-}
-
-func PatherMatchs(matchPath []Header, r *http.Request) bool {
-	matchs := len(matchPath) - 1
-	for ; matchs >= 0; matchs -= 1 {
-		if !matchPath[matchs].Match(r.RequestURI) {
-			break
-		}
-	}
-	return matchs == -1
-}
-
-func HeaderMatchs(matchHeader []Header, r *http.Request) bool {
-	matchs := len(matchHeader) - 1
-	for ; matchs >= 0; matchs -= 1 {
-		if !matchHeader[matchs].Match(r.Header.Get(matchHeader[matchs].Key)) {
-			break
-		}
-	}
-	return matchs == -1
-}
-
-func BodyMatchs(matchBody []Body, r *http.Request) (reader io.ReadCloser, e error) {
-	reader = r.Body
-	for i := 0; i < len(matchBody); i++ {
-		reader, e = matchBody[i].Match(reader)
-		if e != nil {
-			return
-		}
-	}
-	return
 }
 
 func (t *Back) be(opT time.Time) {
@@ -332,94 +363,20 @@ func (t *Back) IsLive() bool {
 }
 
 func (t *Back) Disable() {
-	if t.ErrBanSec == 0 {
-		t.ErrBanSec = 1
+	tmp := t.getErrBanSec()
+	if tmp == 0 {
+		tmp = 1
 	}
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.disableC += 1
-	t.upT = time.Now().Add(time.Second * time.Duration(t.ErrBanSec))
+	t.upT = time.Now().Add(time.Second * time.Duration(tmp))
 }
 
-type Dealer struct {
-	ErrToSec  float64  `json:"errToSec"`
-	Splicing  int      `json:"splicing"`
-	ErrBanSec int      `json:"errBanSec"`
-	ReqPather []Header `json:"reqPather"`
-	ReqHeader []Header `json:"reqHeader"`
-	ResHeader []Header `json:"resHeader"`
-	ReqBody   []Body   `json:"reqBody"`
-}
-
-type Header struct {
-	Action   string `json:"action"`
-	Key      string `json:"key"`
-	MatchExp string `json:"matchExp"`
-	Value    string `json:"value"`
-}
-
-func (t *Header) Match(value string) bool {
-	if t.Action != "access" && t.Action != "deny" {
-		return true
-	}
-	if t.MatchExp != "" {
-		if exp, e := regexp.Compile(t.MatchExp); e != nil || !exp.MatchString(value) {
-			return t.Action == "deny"
-		}
-	}
-	return t.Action == "access"
-}
-
-type Body struct {
-	Action   string `json:"action"`
-	ReqSize  string `json:"reqSize"`
-	MatchExp string `json:"matchExp"`
-}
-
-func (t *Body) Match(r io.ReadCloser) (d io.ReadCloser, err error) {
-	if exp, e := regexp.Compile(t.MatchExp); e == nil {
-		if t.ReqSize == "" {
-			t.ReqSize = "1M"
-		}
-
-		var (
-			size, err = humanize.ParseBytes(t.ReqSize)
-			buf       = make([]byte, size)
-			n         int
-		)
-
-		if err != nil {
-			return nil, err
-		}
-
-		for n < int(size) && err == nil {
-			var nn int
-			nn, err = r.Read(buf[n:])
-			n += nn
-		}
-		if n >= int(size) {
-			return nil, errors.New("body overflow")
-		} else if err != nil && !errors.Is(err, io.EOF) {
-			return nil, err
-		}
-		buf = buf[:n]
-
-		switch t.Action {
-		case "access":
-			if !exp.Match(buf) {
-				return nil, errors.New("body deny")
-			}
-		case "deny":
-			if exp.Match(buf) {
-				return nil, errors.New("body deny")
-			}
-		}
-
-		return pio.RWC{
-			R: bytes.NewReader(buf).Read,
-			C: func() error { return nil },
-		}, nil
-	} else {
-		return nil, e
-	}
+type Setting struct {
+	ErrToSec  float64         `json:"errToSec"`
+	Splicing  int             `json:"splicing"`
+	ErrBanSec int             `json:"errBanSec"`
+	Filiter   filiter.Filiter `json:"filiter"`
+	Dealer    dealer.Dealer   `json:"dealer"`
 }

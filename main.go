@@ -13,6 +13,7 @@ import (
 	"time"
 	_ "unsafe"
 
+	"github.com/qydysky/front/dealer"
 	pctx "github.com/qydysky/part/ctx"
 	pweb "github.com/qydysky/part/web"
 )
@@ -78,9 +79,21 @@ func Test(ctx context.Context, port int, logger Logger) {
 		WriteTimeout: time.Second * time.Duration(10),
 	})
 	defer s.Shutdown()
+
 	s.Handle(map[string]func(http.ResponseWriter, *http.Request){
-		`/`: func(w http.ResponseWriter, _ *http.Request) {
-			_, _ = w.Write([]byte("ok"))
+		`/`: func(w http.ResponseWriter, r *http.Request) {
+			if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
+				conn, _ := Upgrade(w, r, http.Header{
+					"Upgrade":              []string{"websocket"},
+					"Connection":           []string{"upgrade"},
+					"Sec-Websocket-Accept": []string{computeAcceptKey(r.Header.Get("Sec-WebSocket-Key"))},
+				})
+				conn.Close()
+			} else {
+				_, _ = io.Copy(io.Discard, r.Body)
+				r.Body.Close()
+				_, _ = w.Write([]byte("ok"))
+			}
 		},
 	})
 	<-ctx1.Done()
@@ -114,7 +127,7 @@ func loadConfig(ctx context.Context, buf []byte, configF File, configS *[]Config
 	return md5k, nil
 }
 
-func copyHeader(s, t http.Header, app []Header) error {
+func copyHeader(s, t http.Header, app []dealer.HeaderDealer) error {
 	sm := (map[string][]string)(s)
 	tm := (map[string][]string)(t)
 	for k, v := range sm {
@@ -136,20 +149,6 @@ func copyHeader(s, t http.Header, app []Header) error {
 	}
 	for _, v := range app {
 		switch v.Action {
-		case `deny`:
-			if va := t.Get(v.Key); va != "" {
-				if exp, e := regexp.Compile(v.MatchExp); e == nil && exp.MatchString(va) {
-					return ErrHeaderCheckFail
-				}
-			}
-		case `access`:
-			if va := t.Get(v.Key); va != "" {
-				if exp, e := regexp.Compile(v.MatchExp); e != nil || !exp.MatchString(va) {
-					return ErrHeaderCheckFail
-				}
-			} else {
-				return ErrHeaderCheckFail
-			}
 		case `replace`:
 			if va := t.Get(v.Key); va != "" {
 				t.Set(v.Key, regexp.MustCompile(v.MatchExp).ReplaceAllString(va, v.Value))
@@ -176,10 +175,14 @@ var (
 	ErrReqCreFail      = errors.New("ErrReqCreFail")
 	ErrReqDoFail       = errors.New("ErrReqDoFail")
 	ErrResDoFail       = errors.New("ErrResDoFail")
+	ErrResTO           = errors.New("ErrResTO")
+	ErrUriTooLong      = errors.New("ErrUriTooLong")
 	ErrPatherCheckFail = errors.New("ErrPatherCheckFail")
 	ErrHeaderCheckFail = errors.New("ErrHeaderCheckFail")
 	ErrBodyCheckFail   = errors.New("ErrBodyCheckFail")
 	ErrAllBacksFail    = errors.New("ErrAllBacksFail")
 	ErrBackFail        = errors.New("ErrBackFail")
 	ErrNoRoute         = errors.New("ErrNoRoute")
+	ErrDealReqHeader   = errors.New("ErrDealReqHeader")
+	ErrDealResHeader   = errors.New("ErrDealResHeader")
 )

@@ -26,8 +26,10 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 	var (
 		opT        = time.Now()
 		resp       *http.Response
+		e          error
 		conn       net.Conn
 		chosenBack *Back
+		errFormat  = "%v > %v > %v ws %v %v"
 	)
 
 	for 0 < len(backs) && (resp == nil || conn == nil) {
@@ -38,19 +40,8 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 			continue
 		}
 
-		if !PatherMatchs(chosenBack.ReqPather, r) {
-			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrPatherCheckFail, time.Since(opT)))
-			return ErrPatherCheckFail
-		}
-
-		_, e := BodyMatchs(chosenBack.tmp.ReqBody, r)
-		if e != nil {
-			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-			return ErrBodyCheckFail
-		}
-
 		url := chosenBack.To
-		if chosenBack.PathAdd {
+		if chosenBack.PathAdd() {
 			url += r.RequestURI
 		}
 
@@ -58,21 +49,21 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 
 		reqHeader := make(http.Header)
 
-		if e := copyHeader(r.Header, reqHeader, chosenBack.tmp.ReqHeader); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-			return e
+		if e := copyHeader(r.Header, reqHeader, chosenBack.Setting.Dealer.ReqHeader); e != nil {
+			logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+			return ErrDealReqHeader
 		}
 
 		conn, resp, e = DialContext(ctx, url, reqHeader)
 		if e != nil && !errors.Is(e, context.Canceled) {
-			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+			logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 			chosenBack.Disable()
 			conn = nil
 			resp = nil
 		}
 
-		if chosenBack.ErrToSec != 0 && time.Since(opT).Seconds() > chosenBack.ErrToSec {
-			logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws 超时响应 %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
+		if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
+			logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrResTO, time.Since(opT)))
 			chosenBack.Disable()
 			conn.Close()
 			conn = nil
@@ -81,12 +72,21 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 	}
 
 	if resp == nil || conn == nil {
-		logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrBackFail, time.Since(opT)))
+		logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrBackFail, time.Since(opT)))
 		return ErrAllBacksFail
 	}
 
 	if pctx.Done(r.Context()) {
 		return context.Canceled
+	}
+
+	if ok, e := chosenBack.getFiliterResHeader().Match(resp.Header); e != nil {
+		logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+	} else if !ok {
+		logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrHeaderCheckFail, time.Since(opT)))
+		w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
+		w.WriteHeader(http.StatusForbidden)
+		return ErrHeaderCheckFail
 	}
 
 	logger.Debug(`T:`, fmt.Sprintf("%v > %v > %v ws ok %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
@@ -96,11 +96,11 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		defer chosenBack.ed()
 	}
 
-	if chosenBack.Splicing != 0 {
+	if chosenBack.Splicing() != 0 {
 		cookie := &http.Cookie{
 			Name:   "_psign_" + cookie,
 			Value:  chosenBack.Id(),
-			MaxAge: chosenBack.Splicing,
+			MaxAge: chosenBack.Splicing(),
 			Path:   "/",
 		}
 		if validCookieDomain(r.Host) {
@@ -114,9 +114,9 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 	defer conn.Close()
 
 	resHeader := make(http.Header)
-	if e := copyHeader(resp.Header, resHeader, chosenBack.tmp.ResHeader); e != nil {
-		logger.Warn(`W:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-		return e
+	if e := copyHeader(resp.Header, resHeader, chosenBack.Setting.Dealer.ResHeader); e != nil {
+		logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+		return ErrDealResHeader
 	}
 
 	if req, e := Upgrade(w, r, resHeader); e != nil {
@@ -130,7 +130,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 				if !errors.Is(e, context.Canceled) {
 					chosenBack.Disable()
 				}
-				logger.Error(`E:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+				logger.Error(`E:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 				return ErrCopy
 			}
 		case e := <-copyWsMsg(conn, req, blocksi):
@@ -138,7 +138,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 				if !errors.Is(e, context.Canceled) {
 					chosenBack.Disable()
 				}
-				logger.Error(`E:`, fmt.Sprintf("%v > %v > %v ws %v %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+				logger.Error(`E:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 				return ErrCopy
 			}
 		case <-ctx.Done():
@@ -319,16 +319,13 @@ func DialContext(ctx context.Context, urlStr string, requestHeader http.Header) 
 		}
 	}
 
-	var br *bufio.Reader
-	if br == nil {
-		if d.ReadBufferSize == 0 {
-			d.ReadBufferSize = defaultReadBufferSize
-		} else if d.ReadBufferSize < maxControlFramePayloadSize {
-			// must be large enough for control frame
-			d.ReadBufferSize = maxControlFramePayloadSize
-		}
-		br = bufio.NewReaderSize(netConn, d.ReadBufferSize)
+	if d.ReadBufferSize == 0 {
+		d.ReadBufferSize = defaultReadBufferSize
+	} else if d.ReadBufferSize < maxControlFramePayloadSize {
+		// must be large enough for control frame
+		d.ReadBufferSize = maxControlFramePayloadSize
 	}
+	br := bufio.NewReaderSize(netConn, d.ReadBufferSize)
 
 	if err := req.Write(netConn); err != nil {
 		return nil, nil, err
@@ -472,7 +469,7 @@ func Upgrade(w http.ResponseWriter, r *http.Request, responseHeader http.Header)
 			u.WriteBufferSize = defaultWriteBufferSize
 		}
 		u.WriteBufferSize += maxFrameHeaderSize
-		if writeBuf == nil && u.WriteBufferPool == nil {
+		if u.WriteBufferPool == nil {
 			writeBuf = make([]byte, u.WriteBufferSize)
 		}
 	}
