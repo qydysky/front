@@ -41,7 +41,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 			return ErrReqCreFail
 		}
 
-		if e := copyHeader(r.Header, req.Header, chosenBack.Setting.Dealer.ReqHeader); e != nil {
+		if e := copyHeader(r.Header, req.Header, chosenBack.getDealerReqHeader()); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
 			return ErrDealReqHeader
 		}
@@ -101,7 +101,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 	w.Header().Add(header+"Info", cookie+";"+chosenBack.Name)
 
-	if e := copyHeader(resp.Header, w.Header(), chosenBack.Setting.Dealer.ResHeader); e != nil {
+	if e := copyHeader(resp.Header, w.Header(), chosenBack.getDealerResHeader()); e != nil {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
 		return ErrDealResHeader
 	}

@@ -49,7 +49,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 
 		reqHeader := make(http.Header)
 
-		if e := copyHeader(r.Header, reqHeader, chosenBack.Setting.Dealer.ReqHeader); e != nil {
+		if e := copyHeader(r.Header, reqHeader, chosenBack.getDealerReqHeader()); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 			return ErrDealReqHeader
 		}
@@ -114,7 +114,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 	defer conn.Close()
 
 	resHeader := make(http.Header)
-	if e := copyHeader(resp.Header, resHeader, chosenBack.Setting.Dealer.ResHeader); e != nil {
+	if e := copyHeader(resp.Header, resHeader, chosenBack.getDealerResHeader()); e != nil {
 		logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 		return ErrDealResHeader
 	}

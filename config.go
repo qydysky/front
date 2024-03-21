@@ -336,6 +336,12 @@ func (t *Back) getFiliterResHeader() *filiter.Header {
 		return &t.Filiter.ResHeader
 	}
 }
+func (t *Back) getDealerReqHeader() []dealer.HeaderDealer {
+	return append(t.route.Dealer.ReqHeader, t.Dealer.ReqHeader...)
+}
+func (t *Back) getDealerResHeader() []dealer.HeaderDealer {
+	return append(t.route.Dealer.ResHeader, t.Dealer.ResHeader...)
+}
 
 func (t *Back) Id() string {
 	return fmt.Sprintf("%p", t)
