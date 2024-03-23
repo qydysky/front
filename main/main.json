@@ -1,34 +1,77 @@
 [
   {
-    "addr": "0.0.0.0:8081",
+    "addr": "127.0.0.1:0",
     "matchRule": "prefix",
-    "copyBlocks": 100,
+    "copyBlocks": 1000,
+    "tls": {
+      "pub": "",
+      "key": ""
+    },
     "routes": [
       {
-        "path": "/",
-        "pathAdd": true,
-        "rollRule": "resDur_MinFirst",
-        "reqPather": [
-          {
-            "action": "deny",
-            "matchExp": "(\\.\/|\/\\.|\/\/|\\|<|>|\\.sh|\\.cmd|\\.so|\\.exe|\\.bat|http|ftp)"
+        "path": "",
+        "pathAdd": false,
+        "rollRule": "",
+        "reqBody": {
+          "action": "",
+          "reqSize": "1M",
+          "matchExp": ""
+        },
+        "splicing": 0,
+        "errToSec": 0,
+        "errBanSec": 0,
+        "insecureSkipVerify": false,
+        "verifyPeerCer": "",
+        "filiter": {
+          "reqUri": {
+            "accessRule": "",
+            "items": {
+              "": ""
+            }
+          },
+          "reqHeader": {
+            "accessRule": "",
+            "items": {
+              "": {
+                "key": "",
+                "matchExp": ""
+              }
+            }
+          },
+          "resHeader": {
+            "accessRule": "",
+            "items": {
+              "": {
+                "key": "",
+                "matchExp": ""
+              }
+            }
           }
-        ],
+        },
+        "dealer": {
+          "reqHeader": [
+            {
+              "action": "",
+              "key": "",
+              "matchExp": "",
+              "value": ""
+            }
+          ],
+          "resHeader": [
+            {
+              "action": "",
+              "key": "",
+              "matchExp": "",
+              "value": ""
+            }
+          ]
+        },
         "backs": [
           {
-            "name": "baidu1",
-            "to": "s://www.baidu.com",
-            "weight": 1
-          },
-          {
-            "name": "baidu2",
-            "to": "s://www.baidu.com",
-            "weight": 2
-          },
-          {
-            "name": "baidu3",
-            "to": "s://www.baidu.com",
-            "weight": 1
+            "name": "b1",
+            "to": "",
+            "weight": 1,
+            "alwaysUp": false
           }
         ]
       }

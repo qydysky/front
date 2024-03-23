@@ -100,12 +100,12 @@ func Test(ctx context.Context, port int, logger Logger) {
 }
 
 func loadConfig(ctx context.Context, buf []byte, configF File, configS *[]Config, logger Logger) (md5k string, e error) {
-	defer func() {
-		if err := recover(); err != nil {
-			logger.Error(`E:`, err)
-			e = errors.New("read panic")
-		}
-	}()
+	// defer func() {
+	// 	if err := recover(); err != nil {
+	// 		logger.Error(`E:`, err)
+	// 		e = errors.New("read panic")
+	// 	}
+	// }()
 	if i, e := configF.Read(buf); e != nil && !errors.Is(e, io.EOF) {
 		return "", e
 	} else if i == cap(buf) {

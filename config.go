@@ -83,6 +83,9 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 	var add = func(k string, route *Route, logger Logger) {
 		route.config = t
+		if route.Path == "" {
+			return
+		}
 		logger.Info(`I:`, fmt.Sprintf("%v > %v", t.Addr, k))
 		t.routeMap.Store(k, route)
 
@@ -182,21 +185,6 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 		t.routeP.Store(k, nil)
 	}
 
-	var routeU = func(route *Route, logger Logger) {
-		route.SwapSign(
-			func(k string, b *Back) {
-				b.route = route
-				logger.Info(`I:`, fmt.Sprintf("%v > %v > %v", t.Addr, route.Path, b.Name))
-				route.backMap.Store(k, b)
-			},
-			func(k string, b *Back) {
-				logger.Info(`I:`, fmt.Sprintf("%v > %v x %v", t.Addr, route.Path, b.Name))
-				route.backMap.Delete(k)
-			},
-			logger,
-		)
-	}
-
 	t.routeMap.Range(func(key, value any) bool {
 		var exist bool
 		for k := 0; k < len(t.Routes); k++ {
@@ -215,7 +203,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 		if _, ok := t.routeMap.Load(t.Routes[i].Path); !ok {
 			add(t.Routes[i].Path, &t.Routes[i], logger)
 		}
-		routeU(&t.Routes[i], logger)
+		t.Routes[i].SwapSign(logger)
 	}
 }
 
@@ -236,7 +224,10 @@ func (t *Route) Id() string {
 	return fmt.Sprintf("%p", t)
 }
 
-func (t *Route) SwapSign(add func(string, *Back), del func(string, *Back), logger Logger) {
+func (t *Route) SwapSign(logger Logger) {
+	if t.Path == "" {
+		return
+	}
 	t.backMap.Range(func(key, value any) bool {
 		var exist bool
 		for k := 0; k < len(t.Backs); k++ {
@@ -246,14 +237,17 @@ func (t *Route) SwapSign(add func(string, *Back), del func(string, *Back), logge
 			}
 		}
 		if !exist {
-			del(key.(string), value.(*Back))
+			logger.Info(`I:`, fmt.Sprintf("%v > %v x %v", t.config.Addr, t.Path, value.(*Back).Name))
+			t.backMap.Delete(key)
 		}
 		return true
 	})
 
 	for i := 0; i < len(t.Backs); i++ {
 		if _, ok := t.backMap.Load(t.Backs[i].Id()); !ok {
-			add(t.Backs[i].Id(), &t.Backs[i])
+			t.Backs[i].route = t
+			logger.Info(`I:`, fmt.Sprintf("%v > %v > %v", t.config.Addr, t.Path, t.Backs[i].Name))
+			t.backMap.Store(t.Backs[i].Id(), &t.Backs[i])
 		}
 		t.Backs[i].SwapSign(logger)
 	}

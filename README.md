@@ -24,7 +24,6 @@ config:
 - *tls*: {} 启用tls
     - *pub*: string 公钥pem路径
     - *key*: string 私钥pem路径
-- version: string 配置版本，当变化时，将重载
 - routes: [] 路由
     - path: string 路径
     - pathAdd: bool 将客户端访问的路径附加在path上 例：/api/req => /ws => /ws/api/req
@@ -37,7 +36,7 @@ config:
         - (使用rand.Shuffle随机，默认)
     - reqBody: 请求后端前，请求数据过滤器
         - action: string 可选`access`、`deny`。
-        - reqSize：string 限定请求数据大小，默认为`1M`
+        - reqSize: string 限定请求数据大小，默认为`1M`
         - matchExp: string `access`时如不匹配将结束请求。`deny`时如匹配将结束请求。
     - setting... 将会给backs默认值
     - backs: [] 后端
