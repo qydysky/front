@@ -175,6 +175,7 @@ var (
 	ErrReqCreFail      = errors.New("ErrReqCreFail")
 	ErrReqDoFail       = errors.New("ErrReqDoFail")
 	ErrResDoFail       = errors.New("ErrResDoFail")
+	ErrResFail         = errors.New("ErrResFail")
 	ErrResTO           = errors.New("ErrResTO")
 	ErrUriTooLong      = errors.New("ErrUriTooLong")
 	ErrPatherCheckFail = errors.New("ErrPatherCheckFail")
@@ -185,4 +186,5 @@ var (
 	ErrNoRoute         = errors.New("ErrNoRoute")
 	ErrDealReqHeader   = errors.New("ErrDealReqHeader")
 	ErrDealResHeader   = errors.New("ErrDealResHeader")
+	ErrCerVerify       = errors.New("ErrCerVerify")
 )

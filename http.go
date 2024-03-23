@@ -2,6 +2,8 @@ package front
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -21,13 +23,11 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 		logFormat  = "%v%v > %v http %v %v %v"
 	)
 
-	for 0 < len(backs) && resp == nil {
-		chosenBack = backs[0]
-		backs = backs[1:]
-
-		if !chosenBack.IsLive() {
+	for i := 0; i < len(backs) && resp == nil; i++ {
+		if !backs[i].IsLive() {
 			continue
 		}
+		chosenBack = backs[i]
 
 		url := chosenBack.To
 		if chosenBack.PathAdd() {
@@ -46,14 +46,44 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 			return ErrDealReqHeader
 		}
 
+		customTransport := http.DefaultTransport.(*http.Transport).Clone()
+
+		customTransport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: chosenBack.getInsecureSkipVerify(),
+		}
+
+		if cer, err := chosenBack.getVerifyPeerCer(); err == nil {
+			pool := x509.NewCertPool()
+			if pool.AppendCertsFromPEM(cer) {
+				customTransport.TLSClientConfig.InsecureSkipVerify = true
+				customTransport.TLSClientConfig.VerifyPeerCertificate = func(rawCerts [][]byte, _ [][]*x509.Certificate) (e error) {
+					if len(rawCerts) == 0 {
+						return ErrCerVerify
+					}
+					if serCer, err := x509.ParseCertificate(rawCerts[0]); err != nil {
+						return err
+					} else if _, err = serCer.Verify(x509.VerifyOptions{Intermediates: pool, Roots: pool}); err != nil {
+						return err
+					}
+					return
+				}
+			} else {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", ErrCerVerify, time.Since(opT)))
+			}
+		} else if err != ErrEmptyVerifyPeerCerByte {
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", err, time.Since(opT)))
+		}
+
 		client := http.Client{
+			Transport: customTransport,
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				return ErrRedirect
 			},
 		}
+
 		resp, e = client.Do(req)
 		if e != nil && !errors.Is(e, ErrRedirect) && !errors.Is(e, context.Canceled) {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
 			chosenBack.Disable()
 			resp = nil
 		}
@@ -65,9 +95,12 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 		}
 	}
 
-	if resp == nil {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", ErrAllBacksFail, time.Since(opT)))
+	if chosenBack == nil {
 		return ErrAllBacksFail
+	}
+
+	if resp == nil {
+		return ErrResFail
 	}
 
 	if ok, e := chosenBack.getFiliterResHeader().Match(resp.Header); e != nil {

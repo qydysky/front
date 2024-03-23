@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -32,13 +33,11 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		errFormat  = "%v > %v > %v ws %v %v"
 	)
 
-	for 0 < len(backs) && (resp == nil || conn == nil) {
-		chosenBack = backs[0]
-		backs = backs[1:]
-
-		if !chosenBack.IsLive() {
+	for i := 0; i < len(backs) && (resp == nil || conn == nil); i++ {
+		if !backs[i].IsLive() {
 			continue
 		}
+		chosenBack = backs[i]
 
 		url := chosenBack.To
 		if chosenBack.PathAdd() {
@@ -54,7 +53,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 			return ErrDealReqHeader
 		}
 
-		conn, resp, e = DialContext(ctx, url, reqHeader)
+		conn, resp, e = DialContext(ctx, url, reqHeader, chosenBack)
 		if e != nil && !errors.Is(e, context.Canceled) {
 			logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 			chosenBack.Disable()
@@ -71,9 +70,12 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		}
 	}
 
-	if resp == nil || conn == nil {
-		logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrBackFail, time.Since(opT)))
+	if chosenBack == nil {
 		return ErrAllBacksFail
+	}
+
+	if resp == nil || conn == nil {
+		return ErrResFail
 	}
 
 	if pctx.Done(r.Context()) {
@@ -162,7 +164,7 @@ func copyWsMsg(dst io.Writer, src io.Reader, blocksi pslice.BlocksI[byte]) <-cha
 	return c
 }
 
-func DialContext(ctx context.Context, urlStr string, requestHeader http.Header) (net.Conn, *http.Response, error) {
+func DialContext(ctx context.Context, urlStr string, requestHeader http.Header, chosenBack *Back) (net.Conn, *http.Response, error) {
 	d := websocket.DefaultDialer
 
 	challengeKey := requestHeader.Get("Sec-WebSocket-Key")
@@ -303,6 +305,30 @@ func DialContext(ctx context.Context, urlStr string, requestHeader http.Header) 
 		if cfg.ServerName == "" {
 			cfg.ServerName = hostNoPort
 		}
+		cfg.InsecureSkipVerify = chosenBack.getInsecureSkipVerify()
+
+		if cer, err := chosenBack.getVerifyPeerCer(); err == nil {
+			pool := x509.NewCertPool()
+			if pool.AppendCertsFromPEM(cer) {
+				cfg.InsecureSkipVerify = true
+				cfg.VerifyPeerCertificate = func(rawCerts [][]byte, _ [][]*x509.Certificate) (e error) {
+					if len(rawCerts) == 0 {
+						return ErrCerVerify
+					}
+					if serCer, err := x509.ParseCertificate(rawCerts[0]); err != nil {
+						return err
+					} else if _, err = serCer.Verify(x509.VerifyOptions{Intermediates: pool, Roots: pool}); err != nil {
+						return err
+					}
+					return
+				}
+			} else {
+				return nil, nil, ErrCerVerify
+			}
+		} else if err != ErrEmptyVerifyPeerCerByte {
+			return nil, nil, err
+		}
+
 		tlsConn := tls.Client(netConn, cfg)
 		netConn = tlsConn
 

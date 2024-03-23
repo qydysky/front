@@ -24,6 +24,7 @@ config:
 - *tls*: {} 启用tls
     - *pub*: string 公钥pem路径
     - *key*: string 私钥pem路径
+- version: string 配置版本，当变化时，将重载
 - routes: [] 路由
     - path: string 路径
     - pathAdd: bool 将客户端访问的路径附加在path上 例：/api/req => /ws => /ws/api/req
@@ -43,6 +44,7 @@ config:
         - name: string 后端名称，将在日志中显示
         - to: string 后端地址，例`s://www.baidu.com`，会根据客户端自动添加http or ws在地址前
         - weight: int 权重，按routes中的全部back的权重比分配，当权重为0时，将停止新请求的进入
+        - alwaysUp: bool 总是在线
         - setting...
 
 setting:
@@ -50,6 +52,8 @@ setting:
 - splicing: int 当客户端支持cookie时，将会固定使用后端多少秒，默认不启用
 - errToSec: float64 当后端响应超过(ws则指初次返回时间)指定秒，将会触发errBanSec
 - errBanSec: int 当后端错误时（指连接失败，不指后端错误响应），将会禁用若干秒
+- insecureSkipVerify: bool 忽略不安全的tls证书
+- verifyPeerCer: string 路径，校验服务器证书，使用intermediate_ca
 
 - filiter:
     - reqUri: 请求后端前，请求路径过滤器

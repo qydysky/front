@@ -3,10 +3,12 @@ package front
 import (
 	"context"
 	"crypto/tls"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -211,9 +213,9 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 	for i := 0; i < len(t.Routes); i++ {
 		if _, ok := t.routeMap.Load(t.Routes[i].Path); !ok {
-			routeU(&t.Routes[i], logger)
 			add(t.Routes[i].Path, &t.Routes[i], logger)
 		}
+		routeU(&t.Routes[i], logger)
 	}
 }
 
@@ -253,6 +255,7 @@ func (t *Route) SwapSign(add func(string, *Back), del func(string, *Back), logge
 		if _, ok := t.backMap.Load(t.Backs[i].Id()); !ok {
 			add(t.Backs[i].Id(), &t.Backs[i])
 		}
+		t.Backs[i].SwapSign(logger)
 	}
 }
 
@@ -286,11 +289,25 @@ type Back struct {
 	lastResDru time.Duration `json:"-"`
 	resDru     time.Duration `json:"-"`
 
-	Name   string `json:"name"`
-	To     string `json:"to"`
-	Weight int    `json:"weight"`
+	Name     string `json:"name"`
+	To       string `json:"to"`
+	Weight   int    `json:"weight"`
+	AlwaysUp bool   `json:"alwaysUp"`
 
 	Setting
+}
+
+func (t *Back) SwapSign(logger Logger) {
+	path := t.VerifyPeerCer
+	if path == "" {
+		path = t.route.VerifyPeerCer
+	}
+	if path == "" {
+		t.verifyPeerCerErr = ErrEmptyVerifyPeerCerByte
+		t.verifyPeerCer = nil
+	} else {
+		t.verifyPeerCer, t.verifyPeerCerErr = os.ReadFile(path)
+	}
 }
 
 func (t *Back) Splicing() int {
@@ -312,6 +329,12 @@ func (t *Back) getErrToSec() float64 {
 	} else {
 		return t.ErrToSec
 	}
+}
+func (t *Back) getInsecureSkipVerify() bool {
+	return t.route.InsecureSkipVerify || t.InsecureSkipVerify
+}
+func (t *Back) getVerifyPeerCer() (cer []byte, e error) {
+	return t.verifyPeerCer, t.verifyPeerCerErr
 }
 func (t *Back) getFiliterReqHeader() *filiter.Header {
 	if !t.Filiter.ReqHeader.Valid() {
@@ -361,12 +384,18 @@ func (t *Back) ed() {
 }
 
 func (t *Back) IsLive() bool {
+	if t.AlwaysUp {
+		return true
+	}
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	return t.upT.Before(time.Now())
 }
 
 func (t *Back) Disable() {
+	if t.AlwaysUp {
+		return
+	}
 	tmp := t.getErrBanSec()
 	if tmp == 0 {
 		tmp = 1
@@ -378,9 +407,32 @@ func (t *Back) Disable() {
 }
 
 type Setting struct {
-	ErrToSec  float64         `json:"errToSec"`
-	Splicing  int             `json:"splicing"`
-	ErrBanSec int             `json:"errBanSec"`
-	Filiter   filiter.Filiter `json:"filiter"`
-	Dealer    dealer.Dealer   `json:"dealer"`
+	ErrToSec           float64         `json:"errToSec"`
+	Splicing           int             `json:"splicing"`
+	ErrBanSec          int             `json:"errBanSec"`
+	InsecureSkipVerify bool            `json:"insecureSkipVerify"`
+	VerifyPeerCer      string          `json:"verifyPeerCer"`
+	Filiter            filiter.Filiter `json:"filiter"`
+	Dealer             dealer.Dealer   `json:"dealer"`
+	verifyPeerCer      []byte
+	verifyPeerCerErr   error
+}
+
+var (
+	ErrEmptyVerifyPeerCerByte = errors.New("ErrEmptyVerifyPeerCerByte")
+)
+
+func LoadX509PubKey(certPEMBlock []byte) tls.Certificate {
+	var cert tls.Certificate
+	for {
+		var certDERBlock *pem.Block
+		certDERBlock, certPEMBlock = pem.Decode(certPEMBlock)
+		if certDERBlock == nil {
+			break
+		}
+		if certDERBlock.Type == "CERTIFICATE" {
+			cert.Certificate = append(cert.Certificate, certDERBlock.Bytes)
+		}
+	}
+	return cert
 }
