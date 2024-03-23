@@ -145,6 +145,6 @@ jobs:
         echo "HASH=$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_ENV
 
     - name: Upload a Release Asset
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: v0.1.${{ env.TIME }}
