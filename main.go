@@ -110,6 +110,8 @@ func loadConfig(ctx context.Context, buf []byte, configF File, configS *[]Config
 		return "", e
 	} else if i == cap(buf) {
 		return "", errors.New(`buf full`)
+	} else if !json.Valid(buf[:i]) {
+		return "", errors.New(`json inValid`)
 	} else {
 		w := md5.New()
 		w.Write(buf[:i])
