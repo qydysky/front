@@ -30,7 +30,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		e          error
 		conn       net.Conn
 		chosenBack *Back
-		errFormat  = "%v > %v > %v ws %v %v"
+		errFormat  = "%v %v > %v > %v ws %v %v"
 	)
 
 	for i := 0; i < len(backs) && (resp == nil || conn == nil); i++ {
@@ -49,20 +49,20 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 		reqHeader := make(http.Header)
 
 		if e := copyHeader(r.Header, reqHeader, chosenBack.getDealerReqHeader()); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+			logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 			return ErrDealReqHeader
 		}
 
 		conn, resp, e = DialContext(ctx, url, reqHeader, chosenBack)
 		if e != nil && !errors.Is(e, context.Canceled) {
-			logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+			logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 			chosenBack.Disable()
 			conn = nil
 			resp = nil
 		}
 
 		if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
-			logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrResTO, time.Since(opT)))
+			logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrResTO, time.Since(opT)))
 			chosenBack.Disable()
 			conn.Close()
 			conn = nil
@@ -83,9 +83,9 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 	}
 
 	if ok, e := chosenBack.getFiliterResHeader().Match(resp.Header); e != nil {
-		logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 	} else if !ok {
-		logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrHeaderCheckFail, time.Since(opT)))
+		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrHeaderCheckFail, time.Since(opT)))
 		w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
 		w.WriteHeader(http.StatusForbidden)
 		return ErrHeaderCheckFail
@@ -117,7 +117,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 
 	resHeader := make(http.Header)
 	if e := copyHeader(resp.Header, resHeader, chosenBack.getDealerResHeader()); e != nil {
-		logger.Warn(`W:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 		return ErrDealResHeader
 	}
 
@@ -132,7 +132,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 				if !errors.Is(e, context.Canceled) {
 					chosenBack.Disable()
 				}
-				logger.Error(`E:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+				logger.Error(`E:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 				return ErrCopy
 			}
 		case e := <-copyWsMsg(conn, req, blocksi):
@@ -140,7 +140,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 				if !errors.Is(e, context.Canceled) {
 					chosenBack.Disable()
 				}
-				logger.Error(`E:`, fmt.Sprintf(errFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+				logger.Error(`E:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 				return ErrCopy
 			}
 		case <-ctx.Done():

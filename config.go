@@ -89,39 +89,39 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 		logger.Info(`I:`, fmt.Sprintf("%v > %v", t.Addr, k))
 		t.routeMap.Store(k, route)
 
-		var logFormat = "%v%v %v %v"
+		var logFormat = "%v %v%v %v %v"
 
 		for _, routePath := range route.Path {
 			t.routeP.Store(routePath, func(w http.ResponseWriter, r *http.Request) {
 				if len(r.RequestURI) > 8000 {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "BLOCK", ErrUriTooLong))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrUriTooLong))
 					w.Header().Add(header+"Error", ErrUriTooLong.Error())
 					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
 
 				if ok, e := route.Filiter.ReqUri.Match(r); e != nil {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "Err", e))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 				} else if !ok {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "BLOCK", ErrPatherCheckFail))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrPatherCheckFail))
 					w.Header().Add(header+"Error", ErrPatherCheckFail.Error())
 					w.WriteHeader(http.StatusForbidden)
 					return
 				}
 
 				if ok, e := route.Filiter.ReqHeader.Match(r.Header); e != nil {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "Err", e))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 				} else if !ok {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "BLOCK", ErrHeaderCheckFail))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrHeaderCheckFail))
 					w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
 					w.WriteHeader(http.StatusForbidden)
 					return
 				}
 
 				if ok, e := route.ReqBody.Match(r); e != nil {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "Err", e))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 				} else if !ok {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "BLOCK", ErrBodyCheckFail))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrBodyCheckFail))
 					w.Header().Add(header+"Error", ErrBodyCheckFail.Error())
 					w.WriteHeader(http.StatusForbidden)
 					return
@@ -133,13 +133,13 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					if backP, aok := route.backMap.Load(t.Value); aok {
 
 						if ok, e := backP.(*Back).getFiliterReqUri().Match(r); e != nil {
-							logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "Err", e))
+							logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 						} else if ok {
 							aok = false
 						}
 
 						if ok, e := backP.(*Back).getFiliterReqHeader().Match(r.Header); e != nil {
-							logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "Err", e))
+							logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 						} else if ok {
 							aok = false
 						}
@@ -155,7 +155,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 				backIs = append(backIs, route.FiliterBackByRequest(r)...)
 
 				if len(backIs) == 0 {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "BLOCK", ErrNoRoute))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrNoRoute))
 					w.Header().Add(header+"Error", ErrNoRoute.Error())
 					w.WriteHeader(http.StatusNotFound)
 					return

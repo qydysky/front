@@ -20,7 +20,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 		opT        = time.Now()
 		resp       *http.Response
 		chosenBack *Back
-		logFormat  = "%v%v > %v http %v %v %v"
+		logFormat  = "%v %v%v > %v http %v %v %v"
 	)
 
 	for i := 0; i < len(backs) && resp == nil; i++ {
@@ -42,7 +42,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 		}
 
 		if e := copyHeader(r.Header, req.Header, chosenBack.getDealerReqHeader()); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
 			return ErrDealReqHeader
 		}
 
@@ -68,10 +68,10 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 					return
 				}
 			} else {
-				logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", ErrCerVerify, time.Since(opT)))
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", ErrCerVerify, time.Since(opT)))
 			}
 		} else if err != ErrEmptyVerifyPeerCerByte {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", err, time.Since(opT)))
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", err, time.Since(opT)))
 		}
 
 		client := http.Client{
@@ -83,13 +83,13 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 		resp, e = client.Do(req)
 		if e != nil && !errors.Is(e, ErrRedirect) && !errors.Is(e, context.Canceled) {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
 			chosenBack.Disable()
 			resp = nil
 		}
 
 		if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", ErrResTO, time.Since(opT)))
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", ErrResTO, time.Since(opT)))
 			chosenBack.Disable()
 			resp = nil
 		}
@@ -104,15 +104,15 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 	}
 
 	if ok, e := chosenBack.getFiliterResHeader().Match(resp.Header); e != nil {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
 	} else if !ok {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", ErrHeaderCheckFail, time.Since(opT)))
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", ErrHeaderCheckFail, time.Since(opT)))
 		w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
 		w.WriteHeader(http.StatusForbidden)
 		return ErrHeaderCheckFail
 	}
 
-	logger.Debug(`T:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT)))
+	logger.Debug(`T:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT)))
 
 	if chosenBack.route.RollRule != `` {
 		chosenBack.be(opT)
@@ -135,7 +135,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 	w.Header().Add(header+"Info", cookie+";"+chosenBack.Name)
 
 	if e := copyHeader(resp.Header, w.Header(), chosenBack.getDealerResHeader()); e != nil {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
 		return ErrDealResHeader
 	}
 
@@ -147,13 +147,13 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 	defer resp.Body.Close()
 	if tmpbuf, put, e := blocksi.Get(); e != nil {
-		logger.Error(`E:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+		logger.Error(`E:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
 		chosenBack.Disable()
 		return ErrCopy
 	} else {
 		defer put()
 		if _, e = io.CopyBuffer(w, resp.Body, tmpbuf); e != nil {
-			logger.Error(`E:`, fmt.Sprintf(logFormat, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+			logger.Error(`E:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
 			if !errors.Is(e, context.Canceled) {
 				chosenBack.Disable()
 			}
