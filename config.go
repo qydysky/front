@@ -189,7 +189,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 	t.routeMap.Range(func(key, value any) bool {
 		var exist bool
-		for k := 0; k < len(t.Routes) && exist == false; k++ {
+		for k := 0; k < len(t.Routes) && !exist; k++ {
 			for _, routePath := range t.Routes[k].Path {
 				if key.(string) == routePath {
 					exist = true
@@ -204,8 +204,8 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 	})
 
 	for i := 0; i < len(t.Routes); i++ {
-		if _, ok := t.routeMap.Load(t.Routes[i].Path); !ok {
-			for _, routePath := range t.Routes[i].Path {
+		for _, routePath := range t.Routes[i].Path {
+			if _, ok := t.routeMap.Load(routePath); !ok {
 				add(routePath, &t.Routes[i], logger)
 			}
 		}
