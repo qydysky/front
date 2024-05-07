@@ -9,7 +9,7 @@
     },
     "routes": [
       {
-        "path": "",
+        "path": [""],
         "pathAdd": false,
         "rollRule": "",
         "reqBody": {

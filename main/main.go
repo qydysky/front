@@ -23,6 +23,7 @@ func main() {
 
 	// 获取config路径
 	configP := flag.String("c", "main.json", "config")
+	logfile := flag.String("log", "main.log", "logfile")
 	testP := flag.Int("t", 0, "test port")
 	_ = flag.Bool("q", false, "no log")
 	_ = flag.Bool("dq", false, "no debug log")
@@ -31,6 +32,7 @@ func main() {
 	// 日志初始化
 	logger := plog.New(plog.Config{
 		Stdout: true,
+		File:   *logfile,
 		Prefix_string: map[string]struct{}{
 			`T:`: plog.On,
 			`I:`: plog.On,

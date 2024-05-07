@@ -83,7 +83,7 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 	var add = func(k string, route *Route, logger Logger) {
 		route.config = t
-		if route.Path == "" {
+		if len(route.Path) == 0 {
 			return
 		}
 		logger.Info(`I:`, fmt.Sprintf("%v > %v", t.Addr, k))
@@ -91,92 +91,94 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 		var logFormat = "%v%v %v %v"
 
-		t.routeP.Store(route.Path, func(w http.ResponseWriter, r *http.Request) {
-			if len(r.RequestURI) > 8000 {
-				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "BLOCK", ErrUriTooLong))
-				w.Header().Add(header+"Error", ErrUriTooLong.Error())
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
+		for _, routePath := range route.Path {
+			t.routeP.Store(routePath, func(w http.ResponseWriter, r *http.Request) {
+				if len(r.RequestURI) > 8000 {
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "BLOCK", ErrUriTooLong))
+					w.Header().Add(header+"Error", ErrUriTooLong.Error())
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
 
-			if ok, e := route.Filiter.ReqUri.Match(r); e != nil {
-				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "Err", e))
-			} else if !ok {
-				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "BLOCK", ErrPatherCheckFail))
-				w.Header().Add(header+"Error", ErrPatherCheckFail.Error())
-				w.WriteHeader(http.StatusForbidden)
-				return
-			}
+				if ok, e := route.Filiter.ReqUri.Match(r); e != nil {
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "Err", e))
+				} else if !ok {
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "BLOCK", ErrPatherCheckFail))
+					w.Header().Add(header+"Error", ErrPatherCheckFail.Error())
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
 
-			if ok, e := route.Filiter.ReqHeader.Match(r.Header); e != nil {
-				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "Err", e))
-			} else if !ok {
-				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "BLOCK", ErrHeaderCheckFail))
-				w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
-				w.WriteHeader(http.StatusForbidden)
-				return
-			}
+				if ok, e := route.Filiter.ReqHeader.Match(r.Header); e != nil {
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "Err", e))
+				} else if !ok {
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "BLOCK", ErrHeaderCheckFail))
+					w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
 
-			if ok, e := route.ReqBody.Match(r); e != nil {
-				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "Err", e))
-			} else if !ok {
-				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "BLOCK", ErrBodyCheckFail))
-				w.Header().Add(header+"Error", ErrBodyCheckFail.Error())
-				w.WriteHeader(http.StatusForbidden)
-				return
-			}
+				if ok, e := route.ReqBody.Match(r); e != nil {
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "Err", e))
+				} else if !ok {
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "BLOCK", ErrBodyCheckFail))
+					w.Header().Add(header+"Error", ErrBodyCheckFail.Error())
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
 
-			var backIs []*Back
+				var backIs []*Back
 
-			if t, e := r.Cookie("_psign_" + cookie); e == nil {
-				if backP, aok := route.backMap.Load(t.Value); aok {
+				if t, e := r.Cookie("_psign_" + cookie); e == nil {
+					if backP, aok := route.backMap.Load(t.Value); aok {
 
-					if ok, e := backP.(*Back).getFiliterReqUri().Match(r); e != nil {
-						logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "Err", e))
-					} else if ok {
-						aok = false
-					}
+						if ok, e := backP.(*Back).getFiliterReqUri().Match(r); e != nil {
+							logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "Err", e))
+						} else if ok {
+							aok = false
+						}
 
-					if ok, e := backP.(*Back).getFiliterReqHeader().Match(r.Header); e != nil {
-						logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "Err", e))
-					} else if ok {
-						aok = false
-					}
+						if ok, e := backP.(*Back).getFiliterReqHeader().Match(r.Header); e != nil {
+							logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "Err", e))
+						} else if ok {
+							aok = false
+						}
 
-					if aok {
-						for i := 0; i < backP.(*Back).Weight; i++ {
-							backIs = append(backIs, backP.(*Back))
+						if aok {
+							for i := 0; i < backP.(*Back).Weight; i++ {
+								backIs = append(backIs, backP.(*Back))
+							}
 						}
 					}
 				}
-			}
 
-			backIs = append(backIs, route.FiliterBackByRequest(r)...)
+				backIs = append(backIs, route.FiliterBackByRequest(r)...)
 
-			if len(backIs) == 0 {
-				logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, route.Path, "BLOCK", ErrNoRoute))
-				w.Header().Add(header+"Error", ErrNoRoute.Error())
-				w.WriteHeader(http.StatusNotFound)
-				return
-			}
-
-			var e error
-			if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
-				e = wsDealer(r.Context(), w, r, route.Path, backIs, logger, t.BlocksI)
-			} else {
-				e = httpDealer(r.Context(), w, r, route.Path, backIs, logger, t.BlocksI)
-			}
-			if e != nil {
-				w.Header().Add(header+"Error", e.Error())
-				if errors.Is(e, ErrHeaderCheckFail) || errors.Is(e, ErrBodyCheckFail) {
-					w.WriteHeader(http.StatusForbidden)
-				} else if errors.Is(e, ErrAllBacksFail) {
-					w.WriteHeader(http.StatusBadGateway)
-				} else {
-					t.routeP.GetConn(r).Close()
+				if len(backIs) == 0 {
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, route.config.Addr, routePath, "BLOCK", ErrNoRoute))
+					w.Header().Add(header+"Error", ErrNoRoute.Error())
+					w.WriteHeader(http.StatusNotFound)
+					return
 				}
-			}
-		})
+
+				var e error
+				if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
+					e = wsDealer(r.Context(), w, r, routePath, backIs, logger, t.BlocksI)
+				} else {
+					e = httpDealer(r.Context(), w, r, routePath, backIs, logger, t.BlocksI)
+				}
+				if e != nil {
+					w.Header().Add(header+"Error", e.Error())
+					if errors.Is(e, ErrHeaderCheckFail) || errors.Is(e, ErrBodyCheckFail) {
+						w.WriteHeader(http.StatusForbidden)
+					} else if errors.Is(e, ErrAllBacksFail) {
+						w.WriteHeader(http.StatusBadGateway)
+					} else {
+						t.routeP.GetConn(r).Close()
+					}
+				}
+			})
+		}
 	}
 
 	var del = func(k string, _ *Route, logger Logger) {
@@ -187,10 +189,12 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 	t.routeMap.Range(func(key, value any) bool {
 		var exist bool
-		for k := 0; k < len(t.Routes); k++ {
-			if key.(string) == t.Routes[k].Path {
-				exist = true
-				break
+		for k := 0; k < len(t.Routes) && exist == false; k++ {
+			for _, routePath := range t.Routes[k].Path {
+				if key.(string) == routePath {
+					exist = true
+					break
+				}
 			}
 		}
 		if !exist {
@@ -201,15 +205,17 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 	for i := 0; i < len(t.Routes); i++ {
 		if _, ok := t.routeMap.Load(t.Routes[i].Path); !ok {
-			add(t.Routes[i].Path, &t.Routes[i], logger)
+			for _, routePath := range t.Routes[i].Path {
+				add(routePath, &t.Routes[i], logger)
+			}
 		}
 		t.Routes[i].SwapSign(logger)
 	}
 }
 
 type Route struct {
-	config *Config `json:"-"`
-	Path   string  `json:"path"`
+	config *Config  `json:"-"`
+	Path   []string `json:"path"`
 
 	PathAdd  bool         `json:"pathAdd"`
 	RollRule string       `json:"rollRule"`
@@ -225,7 +231,7 @@ func (t *Route) Id() string {
 }
 
 func (t *Route) SwapSign(logger Logger) {
-	if t.Path == "" {
+	if len(t.Path) == 0 {
 		return
 	}
 	t.backMap.Range(func(key, value any) bool {
@@ -281,7 +287,6 @@ type Back struct {
 	dealingC   int           `json:"-"`
 	chosenC    int           `json:"-"`
 	lastResDru time.Duration `json:"-"`
-	resDru     time.Duration `json:"-"`
 
 	Name     string `json:"name"`
 	To       string `json:"to"`
@@ -302,6 +307,7 @@ func (t *Back) SwapSign(logger Logger) {
 	} else {
 		t.verifyPeerCer, t.verifyPeerCerErr = os.ReadFile(path)
 	}
+	t.AlwaysUp = len(t.route.Backs) == 1 || t.AlwaysUp
 }
 
 func (t *Back) Splicing() int {
@@ -366,7 +372,6 @@ func (t *Back) be(opT time.Time) {
 	t.lock.Lock()
 	t.chosenC += 1
 	t.lastResDru = time.Since(opT)
-	t.resDru += t.lastResDru
 	t.dealingC += 1
 	t.lock.Unlock()
 }

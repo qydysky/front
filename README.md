@@ -25,14 +25,13 @@ config:
     - *pub*: string 公钥pem路径
     - *key*: string 私钥pem路径
 - routes: [] 路由
-    - path: string 路径
+    - path: []string 路径
     - pathAdd: bool 将客户端访问的路径附加在path上 例：/api/req => /ws => /ws/api/req
     - rollRule: string 可选
+        - `order`(按顺序)
         - `disableC_MinFirst`(禁用数较少的优先)
         - `dealingC_MinFirst`(连接数较少的优先)
         - `chosenC_MinFirst`(被选择较少的优先)
-        - `lastResDur_MinFirst`(上次响应时间较短的优先)
-        - `resDur_MinFirst`(总响应时间较短的优先)
         - (使用rand.Shuffle随机，默认)
     - reqBody: 请求后端前，请求数据过滤器
         - action: string 可选`access`、`deny`。
@@ -43,7 +42,7 @@ config:
         - name: string 后端名称，将在日志中显示
         - to: string 后端地址，例`s://www.baidu.com`，会根据客户端自动添加http or ws在地址前
         - weight: int 权重，按routes中的全部back的权重比分配，当权重为0时，将停止新请求的进入
-        - alwaysUp: bool 总是在线
+        - alwaysUp: bool 总是在线， 当只有一个后端时，默认为true
         - setting...
 
 setting:
