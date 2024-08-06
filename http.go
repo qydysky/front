@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"net/http"
 	"time"
 	_ "unsafe"
