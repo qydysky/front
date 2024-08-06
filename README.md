@@ -45,7 +45,7 @@ config:
         - alwaysUp: bool 总是在线， 当只有一个后端时，默认为true
         - setting...
 
-setting:
+setting: json配置不需要setting
 
 - splicing: int 当客户端支持cookie时，将会固定使用后端多少秒，默认不启用
 - errToSec: float64 当后端响应超过(ws则指初次返回时间)指定秒，将会触发errBanSec

@@ -138,7 +138,6 @@ func dealUri(s string, app []dealer.UriDealer) (t string) {
 		default:
 		}
 	}
-	fmt.Println(t, len(app))
 	return
 }
 
