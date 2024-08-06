@@ -357,6 +357,9 @@ func (t *Back) getFiliterResHeader() *filiter.Header {
 		return &t.Filiter.ResHeader
 	}
 }
+func (t *Back) getDealerReqUri() []dealer.UriDealer {
+	return append(t.route.Dealer.ReqUri, t.Dealer.ReqUri...)
+}
 func (t *Back) getDealerReqHeader() []dealer.HeaderDealer {
 	return append(t.route.Dealer.ReqHeader, t.Dealer.ReqHeader...)
 }

@@ -129,6 +129,17 @@ func loadConfig(ctx context.Context, buf []byte, configF File, configS *[]Config
 	return md5k, nil
 }
 
+func dealUri(s *string, app []dealer.UriDealer) (e error) {
+	for _, v := range app {
+		switch v.Action {
+		case `replace`:
+			*s = regexp.MustCompile(v.MatchExp).ReplaceAllString(*s, v.Value)
+		default:
+		}
+	}
+	return
+}
+
 func copyHeader(s, t http.Header, app []dealer.HeaderDealer) error {
 	sm := (map[string][]string)(s)
 	tm := (map[string][]string)(t)
@@ -186,6 +197,7 @@ var (
 	ErrAllBacksFail    = errors.New("ErrAllBacksFail")
 	ErrBackFail        = errors.New("ErrBackFail")
 	ErrNoRoute         = errors.New("ErrNoRoute")
+	ErrDealReqUri      = errors.New("ErrDealReqUri")
 	ErrDealReqHeader   = errors.New("ErrDealReqHeader")
 	ErrDealResHeader   = errors.New("ErrDealResHeader")
 	ErrCerVerify       = errors.New("ErrCerVerify")

@@ -53,6 +53,11 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 			return ErrDealReqHeader
 		}
 
+		if e := dealUri(&url, chosenBack.getDealerReqUri()); e != nil {
+			logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+			return ErrDealReqUri
+		}
+
 		conn, resp, e = DialContext(ctx, url, reqHeader, chosenBack)
 		if e != nil && !errors.Is(e, context.Canceled) {
 			logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))

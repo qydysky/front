@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path"
 	"net/http"
 	"time"
 	_ "unsafe"
@@ -32,10 +31,15 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 		url := chosenBack.To
 		if chosenBack.PathAdd() {
-			url += path.Base(r.RequestURI)
+			url += r.RequestURI
 		}
 
 		url = "http" + url
+
+		if e := dealUri(&url, chosenBack.getDealerReqUri()); e != nil {
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+			return ErrDealReqUri
+		}
 
 		req, e := http.NewRequestWithContext(ctx, r.Method, url, r.Body)
 		if e != nil {

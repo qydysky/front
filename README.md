@@ -71,6 +71,10 @@ setting:
                 - key: string header头
                 - matchExp: string
 - dealer:
+    - reqUri:[] 请求后端前，路径处理器
+        - action: string 可选`replace`。
+        - matchExp: string `replace`时结合value进行替换
+        - value: string `replace`时结合matchExp进行替换。
     - reqHeader:[] 请求后端前，请求头处理器
         - action: string 可选`replace`、`add`、`del`、`set`。
         - key: string 具体处理哪个头
