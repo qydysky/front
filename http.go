@@ -31,7 +31,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 		url := chosenBack.To
 		if chosenBack.PathAdd() {
-			url += r.RequestURI
+			url += path.Base(r.RequestURI)
 		}
 
 		url = "http" + url
