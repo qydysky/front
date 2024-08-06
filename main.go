@@ -129,11 +129,12 @@ func loadConfig(ctx context.Context, buf []byte, configF File, configS *[]Config
 	return md5k, nil
 }
 
-func dealUri(s *string, app []dealer.UriDealer) (e error) {
+func dealUri(s string, app []dealer.UriDealer) (t string) {
+	t = s
 	for _, v := range app {
 		switch v.Action {
 		case `replace`:
-			*s = regexp.MustCompile(v.MatchExp).ReplaceAllString(*s, v.Value)
+			t = regexp.MustCompile(v.MatchExp).ReplaceAllString(t, v.Value)
 		default:
 		}
 	}

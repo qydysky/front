@@ -46,16 +46,13 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 
 		url = "ws" + url
 
+		url = dealUri(url, chosenBack.getDealerReqUri())
+
 		reqHeader := make(http.Header)
 
 		if e := copyHeader(r.Header, reqHeader, chosenBack.getDealerReqHeader()); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 			return ErrDealReqHeader
-		}
-
-		if e := dealUri(&url, chosenBack.getDealerReqUri()); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-			return ErrDealReqUri
 		}
 
 		conn, resp, e = DialContext(ctx, url, reqHeader, chosenBack)

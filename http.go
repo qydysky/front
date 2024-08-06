@@ -36,10 +36,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 
 		url = "http" + url
 
-		if e := dealUri(&url, chosenBack.getDealerReqUri()); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
-			return ErrDealReqUri
-		}
+		url = dealUri(url, chosenBack.getDealerReqUri())
 
 		req, e := http.NewRequestWithContext(ctx, r.Method, url, r.Body)
 		if e != nil {
