@@ -11,6 +11,7 @@ import (
 	"time"
 	_ "unsafe"
 
+	preqf "github.com/qydysky/part/reqf"
 	pslice "github.com/qydysky/part/slice"
 )
 
@@ -128,7 +129,7 @@ func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, rou
 			MaxAge: chosenBack.Splicing(),
 			Path:   "/",
 		}
-		if validCookieDomain(r.Host) {
+		if preqf.ValidCookieDomain(r.Host) {
 			cookie.Domain = r.Host
 		}
 		w.Header().Add("Set-Cookie", (cookie).String())

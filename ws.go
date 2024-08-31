@@ -18,6 +18,7 @@ import (
 	_ "unsafe"
 
 	"github.com/gorilla/websocket"
+	utils "github.com/qydysky/front/utils"
 	pctx "github.com/qydysky/part/ctx"
 	pslice "github.com/qydysky/part/slice"
 	"golang.org/x/net/proxy"
@@ -107,7 +108,7 @@ func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, route
 			MaxAge: chosenBack.Splicing(),
 			Path:   "/",
 		}
-		if validCookieDomain(r.Host) {
+		if utils.ValidCookieDomain(r.Host) {
 			cookie.Domain = r.Host
 		}
 		w.Header().Add("Set-Cookie", (cookie).String())
@@ -182,12 +183,12 @@ func DialContext(ctx context.Context, urlStr string, requestHeader http.Header, 
 	case "wss":
 		u.Scheme = "https"
 	default:
-		return nil, nil, errMalformedURL
+		return nil, nil, utils.ErrMalformedURL
 	}
 
 	if u.User != nil {
 		// User name and password are not allowed in websocket URIs.
-		return nil, nil, errMalformedURL
+		return nil, nil, utils.ErrMalformedURL
 	}
 
 	req := &http.Request{
@@ -240,7 +241,7 @@ func DialContext(ctx context.Context, urlStr string, requestHeader http.Header, 
 			netDial = d.NetDial
 		}
 	default:
-		return nil, nil, errMalformedURL
+		return nil, nil, utils.ErrMalformedURL
 	}
 
 	if netDial == nil {
@@ -284,7 +285,7 @@ func DialContext(ctx context.Context, urlStr string, requestHeader http.Header, 
 		}
 	}
 
-	hostPort, hostNoPort := hostPortNoPort(u)
+	hostPort, hostNoPort := utils.HostPortNoPort(u)
 	trace := httptrace.ContextClientTrace(ctx)
 	if trace != nil && trace.GetConn != nil {
 		trace.GetConn(hostPort)
@@ -303,7 +304,7 @@ func DialContext(ctx context.Context, urlStr string, requestHeader http.Header, 
 	if u.Scheme == "https" && d.NetDialTLSContext == nil {
 		// If NetDialTLSContext is set, assume that the TLS handshake has already been done
 
-		cfg := cloneTLSConfig(d.TLSClientConfig)
+		cfg := utils.CloneTLSConfig(d.TLSClientConfig)
 		if cfg.ServerName == "" {
 			cfg.ServerName = hostNoPort
 		}
@@ -337,7 +338,7 @@ func DialContext(ctx context.Context, urlStr string, requestHeader http.Header, 
 		if trace != nil && trace.TLSHandshakeStart != nil {
 			trace.TLSHandshakeStart()
 		}
-		err := doHandshake(ctx, tlsConn, cfg)
+		err := utils.DoHandshake(ctx, tlsConn, cfg)
 		if trace != nil && trace.TLSHandshakeDone != nil {
 			trace.TLSHandshakeDone(tlsConn.ConnectionState(), err)
 		}
@@ -388,9 +389,9 @@ func DialContext(ctx context.Context, urlStr string, requestHeader http.Header, 
 	}
 
 	if resp.StatusCode != 101 ||
-		!tokenListContainsValue(resp.Header, "Upgrade", "websocket") ||
-		!tokenListContainsValue(resp.Header, "Connection", "upgrade") ||
-		resp.Header.Get("Sec-Websocket-Accept") != computeAcceptKey(challengeKey) {
+		!utils.TokenListContainsValue(resp.Header, "Upgrade", "websocket") ||
+		!utils.TokenListContainsValue(resp.Header, "Connection", "upgrade") ||
+		resp.Header.Get("Sec-Websocket-Accept") != utils.ComputeAcceptKey(challengeKey) {
 		// Before closing the network connection on return from this
 		// function, slurp up some of the response to aid application
 		// debugging.
@@ -414,51 +415,6 @@ type netDialerFunc func(network, addr string) (net.Conn, error)
 func (fn netDialerFunc) Dial(network, addr string) (net.Conn, error) {
 	return fn(network, addr)
 }
-
-//go:linkname doHandshake github.com/gorilla/websocket.doHandshake
-func doHandshake(ctx context.Context, tlsConn *tls.Conn, cfg *tls.Config) error
-
-//go:linkname cloneTLSConfig github.com/gorilla/websocket.cloneTLSConfig
-func cloneTLSConfig(cfg *tls.Config) *tls.Config
-
-//go:linkname hostPortNoPort github.com/gorilla/websocket.hostPortNoPort
-func hostPortNoPort(u *url.URL) (hostPort, hostNoPort string)
-
-//go:linkname errMalformedURL github.com/gorilla/websocket.errMalformedURL
-var errMalformedURL error
-
-//go:linkname errInvalidCompression github.com/gorilla/websocket.errInvalidCompression
-var errInvalidCompression error
-
-//go:linkname generateChallengeKey github.com/gorilla/websocket.generateChallengeKey
-func generateChallengeKey() (string, error)
-
-//go:linkname tokenListContainsValue github.com/gorilla/websocket.tokenListContainsValue
-func tokenListContainsValue(header http.Header, name string, value string) bool
-
-//go:linkname returnError github.com/gorilla/websocket.(*Upgrader).returnError
-// func returnError(u *websocket.Upgrader, w http.ResponseWriter, r *http.Request, status int, reason string) (*websocket.Conn, error)
-
-//go:linkname checkSameOrigin github.com/gorilla/websocket.checkSameOrigin
-func checkSameOrigin(r *http.Request) bool
-
-//go:linkname isValidChallengeKey github.com/gorilla/websocket.isValidChallengeKey
-func isValidChallengeKey(s string) bool
-
-//go:linkname selectSubprotocol github.com/gorilla/websocket.(*Upgrader).selectSubprotocol
-func selectSubprotocol(u *websocket.Upgrader, r *http.Request, responseHeader http.Header) string
-
-//go:linkname parseExtensions github.com/gorilla/websocket.parseExtensions
-func parseExtensions(header http.Header) []map[string]string
-
-//go:linkname bufioReaderSize github.com/gorilla/websocket.bufioReaderSize
-func bufioReaderSize(originalReader io.Reader, br *bufio.Reader) int
-
-//go:linkname bufioWriterBuffer github.com/gorilla/websocket.bufioWriterBuffer
-func bufioWriterBuffer(originalWriter io.Writer, bw *bufio.Writer) []byte
-
-//go:linkname computeAcceptKey github.com/gorilla/websocket.computeAcceptKey
-func computeAcceptKey(challengeKey string) string
 
 const (
 	maxFrameHeaderSize         = 2 + 8 + 4 // Fixed header + length + mask
@@ -486,7 +442,7 @@ func Upgrade(w http.ResponseWriter, r *http.Request, responseHeader http.Header)
 		return nil, errors.New("websocket: client sent data before handshake is complete")
 	}
 
-	buf := bufioWriterBuffer(netConn, brw.Writer)
+	buf := utils.BufioWriterBuffer(netConn, brw.Writer)
 
 	var writeBuf []byte
 	if u.WriteBufferPool == nil && u.WriteBufferSize == 0 && len(buf) >= maxFrameHeaderSize+256 {

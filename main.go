@@ -14,6 +14,7 @@ import (
 	_ "unsafe"
 
 	"github.com/qydysky/front/dealer"
+	utils "github.com/qydysky/front/utils"
 	pctx "github.com/qydysky/part/ctx"
 	pweb "github.com/qydysky/part/web"
 )
@@ -28,9 +29,6 @@ type Logger interface {
 type File interface {
 	Read(data []byte) (int, error)
 }
-
-//go:linkname validCookieDomain net/http.validCookieDomain
-func validCookieDomain(v string) bool
 
 // 加载
 func LoadPeriod(ctx context.Context, buf []byte, configF File, configS *[]Config, logger Logger) error {
@@ -86,7 +84,7 @@ func Test(ctx context.Context, port int, logger Logger) {
 				conn, _ := Upgrade(w, r, http.Header{
 					"Upgrade":              []string{"websocket"},
 					"Connection":           []string{"upgrade"},
-					"Sec-Websocket-Accept": []string{computeAcceptKey(r.Header.Get("Sec-WebSocket-Key"))},
+					"Sec-Websocket-Accept": []string{utils.ComputeAcceptKey(r.Header.Get("Sec-WebSocket-Key"))},
 				})
 				conn.Close()
 			} else {
