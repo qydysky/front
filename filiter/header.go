@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"regexp"
 
-	boolS "github.com/qydysky/part/boolS"
+	boolS "github.com/qydysky/part/bools"
 )
 
 type Header struct {
