@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 	_ "unsafe"
 
@@ -29,12 +30,17 @@ func (localDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		logFormat = "%v %v%v > %v local %v %v %v"
 	)
 
-	url := chosenBack.To
+	path := chosenBack.To
 	if chosenBack.PathAdd() {
-		url += r.RequestURI
+		if s, e := url.PathUnescape(r.URL.Path); e != nil {
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+			return ErrDealReqUri
+		} else {
+			path += s
+		}
 	}
 
-	if !pfile.New(url, 0, true).IsExist() {
+	if !pfile.New(path, 0, true).IsExist() {
 		return ErrReqDoFail
 	}
 
@@ -45,6 +51,6 @@ func (localDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Requ
 
 	logger.Debug(`T:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT)))
 
-	http.ServeFile(w, r.WithContext(ctx), url)
+	http.ServeFile(w, r.WithContext(ctx), path)
 	return nil
 }
