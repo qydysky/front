@@ -15,6 +15,7 @@ import (
 
 	"github.com/qydysky/front/dealer"
 	filiter "github.com/qydysky/front/filiter"
+	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
 	pslice "github.com/qydysky/part/slice"
 	pweb "github.com/qydysky/part/web"
@@ -161,12 +162,26 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					return
 				}
 
-				var e error
-				if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
-					e = wsDealer(r.Context(), w, r, routePath, backIs, logger, t.BlocksI)
-				} else {
-					e = httpDealer(r.Context(), w, r, routePath, backIs, logger, t.BlocksI)
+				var e error = ErrAllBacksFail
+
+				type reqDealer interface {
+					Deal(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
 				}
+
+				for i := 0; i < len(backIs); i++ {
+					if !backIs[i].IsLive() {
+						continue
+					}
+
+					if !strings.Contains(backIs[i].To, "://") {
+						e = component2.Get[reqDealer]("local").Deal(r.Context(), w, r, routePath, backIs[i], logger, t.BlocksI)
+					} else if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
+						e = component2.Get[reqDealer]("ws").Deal(r.Context(), w, r, routePath, backIs[i], logger, t.BlocksI)
+					} else {
+						e = component2.Get[reqDealer]("http").Deal(r.Context(), w, r, routePath, backIs[i], logger, t.BlocksI)
+					}
+				}
+
 				if e != nil {
 					w.Header().Add(header+"Error", e.Error())
 					if errors.Is(e, ErrHeaderCheckFail) || errors.Is(e, ErrBodyCheckFail) {

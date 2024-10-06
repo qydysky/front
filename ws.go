@@ -19,59 +19,70 @@ import (
 
 	"github.com/gorilla/websocket"
 	utils "github.com/qydysky/front/utils"
+	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
 	pslice "github.com/qydysky/part/slice"
 	"golang.org/x/net/proxy"
 )
 
-func wsDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, backs []*Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
+func init() {
+	type I interface {
+		Deal(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
+	}
+	if e := component2.Register[I]("ws", wsDealer{}); e != nil {
+		panic(e)
+	}
+}
+
+type wsDealer struct{}
+
+func (wsDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	var (
-		opT        = time.Now()
-		resp       *http.Response
-		e          error
-		conn       net.Conn
-		chosenBack *Back
-		errFormat  = "%v %v > %v > %v ws %v %v"
+		opT       = time.Now()
+		resp      *http.Response
+		conn      net.Conn
+		errFormat = "%v %v > %v > %v ws %v %v"
 	)
 
-	for i := 0; i < len(backs) && (resp == nil || conn == nil); i++ {
-		if !backs[i].IsLive() {
-			continue
-		}
-		chosenBack = backs[i]
+	// for i := 0; i < len(backs) && (resp == nil || conn == nil); i++ {
+	// 	if !backs[i].IsLive() {
+	// 		continue
+	// 	}
+	// 	chosenBack = backs[i]
 
-		url := chosenBack.To
-		if chosenBack.PathAdd() {
-			url += r.RequestURI
-		}
-
-		url = "ws" + url
-
-		url = dealUri(url, chosenBack.getDealerReqUri())
-
-		reqHeader := make(http.Header)
-
-		if e := copyHeader(r.Header, reqHeader, chosenBack.getDealerReqHeader()); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-			return ErrDealReqHeader
-		}
-
-		conn, resp, e = DialContext(ctx, url, reqHeader, chosenBack)
-		if e != nil && !errors.Is(e, context.Canceled) {
-			logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-			chosenBack.Disable()
-			conn = nil
-			resp = nil
-		}
-
-		if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
-			logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrResTO, time.Since(opT)))
-			chosenBack.Disable()
-			conn.Close()
-			conn = nil
-			resp = nil
-		}
+	url := chosenBack.To
+	if chosenBack.PathAdd() {
+		url += r.RequestURI
 	}
+
+	url = "ws" + url
+
+	url = dealUri(url, chosenBack.getDealerReqUri())
+
+	reqHeader := make(http.Header)
+
+	if e := copyHeader(r.Header, reqHeader, chosenBack.getDealerReqHeader()); e != nil {
+		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+		return ErrDealReqHeader
+	}
+
+	var e error
+	conn, resp, e = DialContext(ctx, url, reqHeader, chosenBack)
+	if e != nil && !errors.Is(e, context.Canceled) {
+		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+		chosenBack.Disable()
+		conn = nil
+		resp = nil
+	}
+
+	if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
+		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrResTO, time.Since(opT)))
+		chosenBack.Disable()
+		conn.Close()
+		conn = nil
+		resp = nil
+	}
+	// }
 
 	if chosenBack == nil {
 		return ErrAllBacksFail

@@ -12,90 +12,93 @@ import (
 	_ "unsafe"
 
 	"github.com/qydysky/front/utils"
+	component2 "github.com/qydysky/part/component2"
 	pslice "github.com/qydysky/part/slice"
 )
 
-func httpDealer(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, backs []*Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
+func init() {
+	type I interface {
+		Deal(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
+	}
+	if e := component2.Register[I]("http", httpDealer{}); e != nil {
+		panic(e)
+	}
+}
 
+type httpDealer struct{}
+
+func (httpDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	var (
-		opT        = time.Now()
-		resp       *http.Response
-		chosenBack *Back
-		logFormat  = "%v %v%v > %v http %v %v %v"
+		opT       = time.Now()
+		resp      *http.Response
+		logFormat = "%v %v%v > %v http %v %v %v"
 	)
 
-	for i := 0; i < len(backs) && resp == nil; i++ {
-		if !backs[i].IsLive() {
-			continue
-		}
-		chosenBack = backs[i]
+	url := chosenBack.To
+	if chosenBack.PathAdd() {
+		url += r.RequestURI
+	}
 
-		url := chosenBack.To
-		if chosenBack.PathAdd() {
-			url += r.RequestURI
-		}
+	url = "http" + url
 
-		url = "http" + url
+	url = dealUri(url, chosenBack.getDealerReqUri())
 
-		url = dealUri(url, chosenBack.getDealerReqUri())
+	req, e := http.NewRequestWithContext(ctx, r.Method, url, r.Body)
+	if e != nil {
+		return ErrReqCreFail
+	}
 
-		req, e := http.NewRequestWithContext(ctx, r.Method, url, r.Body)
-		if e != nil {
-			return ErrReqCreFail
-		}
+	if e := copyHeader(r.Header, req.Header, chosenBack.getDealerReqHeader()); e != nil {
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+		return ErrDealReqHeader
+	}
 
-		if e := copyHeader(r.Header, req.Header, chosenBack.getDealerReqHeader()); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
-			return ErrDealReqHeader
-		}
+	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 
-		customTransport := http.DefaultTransport.(*http.Transport).Clone()
+	customTransport.TLSClientConfig = &tls.Config{
+		InsecureSkipVerify: chosenBack.getInsecureSkipVerify(),
+	}
 
-		customTransport.TLSClientConfig = &tls.Config{
-			InsecureSkipVerify: chosenBack.getInsecureSkipVerify(),
-		}
-
-		if cer, err := chosenBack.getVerifyPeerCer(); err == nil {
-			pool := x509.NewCertPool()
-			if pool.AppendCertsFromPEM(cer) {
-				customTransport.TLSClientConfig.InsecureSkipVerify = true
-				customTransport.TLSClientConfig.VerifyPeerCertificate = func(rawCerts [][]byte, _ [][]*x509.Certificate) (e error) {
-					if len(rawCerts) == 0 {
-						return ErrCerVerify
-					}
-					if serCer, err := x509.ParseCertificate(rawCerts[0]); err != nil {
-						return err
-					} else if _, err = serCer.Verify(x509.VerifyOptions{Intermediates: pool, Roots: pool}); err != nil {
-						return err
-					}
-					return
+	if cer, err := chosenBack.getVerifyPeerCer(); err == nil {
+		pool := x509.NewCertPool()
+		if pool.AppendCertsFromPEM(cer) {
+			customTransport.TLSClientConfig.InsecureSkipVerify = true
+			customTransport.TLSClientConfig.VerifyPeerCertificate = func(rawCerts [][]byte, _ [][]*x509.Certificate) (e error) {
+				if len(rawCerts) == 0 {
+					return ErrCerVerify
 				}
-			} else {
-				logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", ErrCerVerify, time.Since(opT)))
+				if serCer, err := x509.ParseCertificate(rawCerts[0]); err != nil {
+					return err
+				} else if _, err = serCer.Verify(x509.VerifyOptions{Intermediates: pool, Roots: pool}); err != nil {
+					return err
+				}
+				return
 			}
-		} else if err != ErrEmptyVerifyPeerCerByte {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", err, time.Since(opT)))
+		} else {
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", ErrCerVerify, time.Since(opT)))
 		}
+	} else if err != ErrEmptyVerifyPeerCerByte {
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", err, time.Since(opT)))
+	}
 
-		client := http.Client{
-			Transport: customTransport,
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return ErrRedirect
-			},
-		}
+	client := http.Client{
+		Transport: customTransport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return ErrRedirect
+		},
+	}
 
-		resp, e = client.Do(req)
-		if e != nil && !errors.Is(e, ErrRedirect) && !errors.Is(e, context.Canceled) {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
-			chosenBack.Disable()
-			resp = nil
-		}
+	resp, e = client.Do(req)
+	if e != nil && !errors.Is(e, ErrRedirect) && !errors.Is(e, context.Canceled) {
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
+		chosenBack.Disable()
+		resp = nil
+	}
 
-		if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", ErrResTO, time.Since(opT)))
-			chosenBack.Disable()
-			resp = nil
-		}
+	if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", ErrResTO, time.Since(opT)))
+		chosenBack.Disable()
+		resp = nil
 	}
 
 	if chosenBack == nil {
