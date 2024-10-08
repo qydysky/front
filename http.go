@@ -43,7 +43,12 @@ func (httpDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Reque
 
 	url = dealUri(url, chosenBack.getDealerReqUri())
 
-	req, e := http.NewRequestWithContext(ctx, r.Method, url, r.Body)
+	reqBody, e := r.GetBody()
+	if e != nil {
+		return ErrReqCreFail
+	}
+
+	req, e := http.NewRequestWithContext(ctx, r.Method, url, reqBody)
 	if e != nil {
 		return ErrReqCreFail
 	}
