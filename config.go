@@ -181,7 +181,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						e = component2.Get[reqDealer]("http").Deal(r.Context(), w, r, routePath, backIs[i], logger, t.BlocksI)
 					}
 
-					if e == nil {
+					if e == nil || errors.Is(e, ErrReqCreFail) {
 						break
 					}
 				}
@@ -190,6 +190,8 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					w.Header().Add(header+"Error", e.Error())
 					if errors.Is(e, ErrHeaderCheckFail) || errors.Is(e, ErrBodyCheckFail) {
 						w.WriteHeader(http.StatusForbidden)
+					} else if errors.Is(e, ErrReqCreFail) {
+						w.WriteHeader(http.StatusServiceUnavailable)
 					} else if errors.Is(e, ErrAllBacksFail) {
 						w.WriteHeader(http.StatusBadGateway)
 					} else {

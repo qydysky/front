@@ -43,13 +43,10 @@ func (httpDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Reque
 
 	url = dealUri(url, chosenBack.getDealerReqUri())
 
-	reqBody, e := r.GetBody()
+	req, e := http.NewRequestWithContext(ctx, r.Method, url, r.Body)
 	if e != nil {
-		return ErrReqCreFail
-	}
-
-	req, e := http.NewRequestWithContext(ctx, r.Method, url, reqBody)
-	if e != nil {
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
+		chosenBack.Disable()
 		return ErrReqCreFail
 	}
 
