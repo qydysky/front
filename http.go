@@ -94,17 +94,12 @@ func (httpDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	if e != nil && !errors.Is(e, ErrRedirect) && !errors.Is(e, context.Canceled) {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
 		chosenBack.Disable()
-		resp = nil
+		return ErrResFail
 	}
 
 	if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", ErrResTO, time.Since(opT)))
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", ErrResTO, time.Since(opT)))
 		chosenBack.Disable()
-		resp = nil
-	}
-
-	if resp == nil {
-		return ErrResFail
 	}
 
 	if ok, e := chosenBack.getFiliterResHeader().Match(resp.Header); e != nil {
