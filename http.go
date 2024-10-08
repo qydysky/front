@@ -114,7 +114,6 @@ func (httpDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	} else if !ok {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", ErrHeaderCheckFail, time.Since(opT)))
 		w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
-		w.WriteHeader(http.StatusForbidden)
 		return ErrHeaderCheckFail
 	}
 
