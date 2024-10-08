@@ -80,6 +80,10 @@ func (wsDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Request
 	}
 	// }
 
+	if conn == nil || resp == nil {
+		return ErrResFail
+	}
+
 	if pctx.Done(r.Context()) {
 		return context.Canceled
 	}

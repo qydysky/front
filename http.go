@@ -102,6 +102,10 @@ func (httpDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		chosenBack.Disable()
 	}
 
+	if resp == nil {
+		return ErrResFail
+	}
+
 	if ok, e := chosenBack.getFiliterResHeader().Match(resp.Header); e != nil {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
 	} else if !ok {
