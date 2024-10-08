@@ -180,6 +180,10 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					} else {
 						e = component2.Get[reqDealer]("http").Deal(r.Context(), w, r, routePath, backIs[i], logger, t.BlocksI)
 					}
+
+					if e == nil {
+						break
+					}
 				}
 
 				if e != nil {
