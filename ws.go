@@ -101,7 +101,6 @@ func (wsDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Request
 	} else if !ok {
 		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrHeaderCheckFail, time.Since(opT)))
 		w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
-		w.WriteHeader(http.StatusForbidden)
 		return ErrHeaderCheckFail
 	}
 
