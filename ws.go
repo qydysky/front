@@ -84,10 +84,6 @@ func (wsDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Request
 	}
 	// }
 
-	if chosenBack == nil {
-		return ErrAllBacksFail
-	}
-
 	if resp == nil || conn == nil {
 		return ErrResFail
 	}

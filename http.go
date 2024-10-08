@@ -103,10 +103,6 @@ func (httpDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		resp = nil
 	}
 
-	if chosenBack == nil {
-		return ErrAllBacksFail
-	}
-
 	if resp == nil {
 		return ErrResFail
 	}
