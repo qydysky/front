@@ -71,22 +71,14 @@ func (wsDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Request
 	if e != nil && !errors.Is(e, context.Canceled) {
 		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 		chosenBack.Disable()
-		conn = nil
-		resp = nil
+		return ErrResFail
 	}
 
 	if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
 		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrResTO, time.Since(opT)))
 		chosenBack.Disable()
-		conn.Close()
-		conn = nil
-		resp = nil
 	}
 	// }
-
-	if resp == nil || conn == nil {
-		return ErrResFail
-	}
 
 	if pctx.Done(r.Context()) {
 		return context.Canceled
