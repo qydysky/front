@@ -168,7 +168,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					Deal(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
 				}
 
-				for i := 0; i < len(backIs) && errors.Is(e, ErrAllBacksFail); i++ {
+				for i := 0; i < len(backIs); i++ {
 					if !backIs[i].IsLive() {
 						continue
 					}
@@ -179,6 +179,16 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						e = component2.Get[reqDealer]("ws").Deal(r.Context(), w, r, routePath, backIs[i], logger, t.BlocksI)
 					} else {
 						e = component2.Get[reqDealer]("http").Deal(r.Context(), w, r, routePath, backIs[i], logger, t.BlocksI)
+					}
+
+					// no err
+					if e == nil {
+						break
+					}
+
+					// some err can retry
+					if v, ok := e.(ErrCanRetry); !ok || !v.CanRetry {
+						break
 					}
 				}
 
@@ -225,6 +235,18 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 			}
 		}
 		t.Routes[i].SwapSign(logger)
+	}
+}
+
+type ErrCanRetry struct {
+	error
+	CanRetry bool
+}
+
+func MarkRetry(e error) error {
+	return ErrCanRetry{
+		error:    e,
+		CanRetry: true,
 	}
 }
 

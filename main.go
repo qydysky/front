@@ -139,7 +139,7 @@ func dealUri(s string, app []dealer.UriDealer) (t string) {
 	return
 }
 
-func copyHeader(s, t http.Header, app []dealer.HeaderDealer) error {
+func copyHeader(s, t http.Header, app []dealer.HeaderDealer) {
 	sm := (map[string][]string)(s)
 	tm := (map[string][]string)(t)
 	for k, v := range sm {
@@ -174,7 +174,6 @@ func copyHeader(s, t http.Header, app []dealer.HeaderDealer) error {
 		default:
 		}
 	}
-	return nil
 }
 
 var cookie = fmt.Sprintf("%p", &struct{}{})

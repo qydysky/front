@@ -61,17 +61,19 @@ func (wsDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Request
 
 	reqHeader := make(http.Header)
 
-	if e := copyHeader(r.Header, reqHeader, chosenBack.getDealerReqHeader()); e != nil {
-		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-		return ErrDealReqHeader
-	}
+	// if e :=
+	copyHeader(r.Header, reqHeader, chosenBack.getDealerReqHeader())
+	// ; e != nil {
+	// 	logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+	// 	return ErrDealReqHeader
+	// }
 
 	var e error
 	conn, resp, e = DialContext(ctx, url, reqHeader, chosenBack)
 	if e != nil && !errors.Is(e, context.Canceled) {
 		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 		chosenBack.Disable()
-		return ErrResFail
+		return MarkRetry(ErrResFail)
 	}
 
 	if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
@@ -81,7 +83,7 @@ func (wsDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Request
 	// }
 
 	if conn == nil || resp == nil {
-		return ErrResFail
+		return MarkRetry(ErrResFail)
 	}
 
 	if pctx.Done(r.Context()) {
@@ -93,7 +95,7 @@ func (wsDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Request
 	} else if !ok {
 		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrHeaderCheckFail, time.Since(opT)))
 		w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
-		return ErrHeaderCheckFail
+		return MarkRetry(ErrHeaderCheckFail)
 	}
 
 	logger.Debug(`T:`, fmt.Sprintf("%v > %v > %v ws ok %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
@@ -121,13 +123,15 @@ func (wsDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Request
 	defer conn.Close()
 
 	resHeader := make(http.Header)
-	if e := copyHeader(resp.Header, resHeader, chosenBack.getDealerResHeader()); e != nil {
-		logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-		return ErrDealResHeader
-	}
+	// if e :=
+	copyHeader(resp.Header, resHeader, chosenBack.getDealerResHeader())
+	// ; e != nil {
+	// 	logger.Warn(`W:`, fmt.Sprintf(errFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+	// 	return ErrDealResHeader
+	// }
 
 	if req, e := Upgrade(w, r, resHeader); e != nil {
-		return ErrResDoFail
+		return MarkRetry(ErrResDoFail)
 	} else {
 		defer req.Close()
 

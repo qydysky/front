@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 	_ "unsafe"
 
@@ -33,7 +34,7 @@ func (localDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Requ
 	path := chosenBack.To
 	if chosenBack.PathAdd() {
 		if s, e := url.PathUnescape(r.URL.Path); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
 			return ErrDealReqUri
 		} else {
 			path += s
@@ -41,13 +42,15 @@ func (localDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Requ
 	}
 
 	if !pfile.New(path, 0, true).IsExist() {
-		return ErrReqDoFail
+		return MarkRetry(os.ErrNotExist)
 	}
 
-	if e := copyHeader(http.Header{}, w.Header(), chosenBack.getDealerResHeader()); e != nil {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
-		return ErrDealResHeader
-	}
+	// if e :=
+	copyHeader(http.Header{}, w.Header(), chosenBack.getDealerResHeader())
+	// ; e != nil {
+	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+	// 	return ErrDealResHeader
+	// }
 
 	logger.Debug(`T:`, fmt.Sprintf(logFormat, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT)))
 
