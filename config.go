@@ -173,6 +173,10 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						continue
 					}
 
+					backIs[i].lock.Lock()
+					backIs[i].lastChosenT = time.Now()
+					backIs[i].lock.Unlock()
+
 					if !strings.Contains(backIs[i].To, "://") {
 						e = component2.Get[reqDealer]("local").Deal(r.Context(), w, r, routePath, backIs[i], logger, t.BlocksI)
 					} else if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
@@ -292,7 +296,6 @@ func (t *Route) SwapSign(logger Logger) {
 			logger.Info(`I:`, fmt.Sprintf("%v > %v > %v", t.config.Addr, t.Path, t.Backs[i].Name))
 			t.backMap.Store(t.Backs[i].Id(), &t.Backs[i])
 		}
-		t.Backs[i].index = i
 		t.Backs[i].SwapSign(logger)
 	}
 }
@@ -318,19 +321,19 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 }
 
 type Back struct {
-	route    *Route       `json:"-"`
-	lock     sync.RWMutex `json:"-"`
-	upT      time.Time    `json:"-"`
-	index    int          `json:"-"`
-	disableC uint         `json:"-"`
-	dealingC uint         `json:"-"`
-	chosenC  uint         `json:"-"`
+	route       *Route       `json:"-"`
+	lock        sync.RWMutex `json:"-"`
+	upT         time.Time    `json:"-"`
+	lastChosenT time.Time    `json:"-"`
+	disableC    uint         `json:"-"`
+	dealingC    uint         `json:"-"`
+	chosenC     uint         `json:"-"`
 
 	lastResDru time.Duration `json:"-"`
 
 	Name     string `json:"name"`
 	To       string `json:"to"`
-	Weight   uint   `json:"weight"`
+	Weight   uint   `json:"weight,string"`
 	AlwaysUp bool   `json:"alwaysUp"`
 
 	Setting
@@ -347,6 +350,7 @@ func (t *Back) SwapSign(logger Logger) {
 	} else {
 		t.verifyPeerCer, t.verifyPeerCerErr = os.ReadFile(path)
 	}
+	t.lastChosenT = time.Now()
 	t.AlwaysUp = len(t.route.Backs) == 1 || t.AlwaysUp
 }
 

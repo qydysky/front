@@ -30,7 +30,7 @@ func init() {
 
 	rollRuleMap[`loop`] = func(backLink []*Back) {
 		slices.SortStableFunc(backLink, func(a, b *Back) int {
-			return a.index - b.index
+			return a.lastChosenT.Compare(b.lastChosenT)
 		})
 	}
 }
