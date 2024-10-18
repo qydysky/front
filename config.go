@@ -146,7 +146,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						}
 
 						if aok {
-							for i := 0; i < backP.(*Back).Weight; i++ {
+							for i := uint(0); i < backP.(*Back).Weight; i++ {
 								backIs = append(backIs, backP.(*Back))
 							}
 						}
@@ -292,6 +292,7 @@ func (t *Route) SwapSign(logger Logger) {
 			logger.Info(`I:`, fmt.Sprintf("%v > %v > %v", t.config.Addr, t.Path, t.Backs[i].Name))
 			t.backMap.Store(t.Backs[i].Id(), &t.Backs[i])
 		}
+		t.Backs[i].index = i
 		t.Backs[i].SwapSign(logger)
 	}
 }
@@ -301,7 +302,7 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	for i := 0; i < len(t.Backs); i++ {
 		if ok, e := t.Backs[i].getFiliterReqHeader().Match(r.Header); ok && e == nil {
 			t.Backs[i].route = t
-			for k := 0; k < t.Backs[i].Weight; k++ {
+			for k := uint(0); k < t.Backs[i].Weight; k++ {
 				backLink = append(backLink, &t.Backs[i])
 			}
 		}
@@ -317,17 +318,19 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 }
 
 type Back struct {
-	route      *Route        `json:"-"`
-	lock       sync.RWMutex  `json:"-"`
-	upT        time.Time     `json:"-"`
-	disableC   int           `json:"-"`
-	dealingC   int           `json:"-"`
-	chosenC    int           `json:"-"`
+	route    *Route       `json:"-"`
+	lock     sync.RWMutex `json:"-"`
+	upT      time.Time    `json:"-"`
+	index    int          `json:"-"`
+	disableC uint         `json:"-"`
+	dealingC uint         `json:"-"`
+	chosenC  uint         `json:"-"`
+
 	lastResDru time.Duration `json:"-"`
 
 	Name     string `json:"name"`
 	To       string `json:"to"`
-	Weight   int    `json:"weight"`
+	Weight   uint   `json:"weight"`
 	AlwaysUp bool   `json:"alwaysUp"`
 
 	Setting

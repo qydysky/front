@@ -12,19 +12,25 @@ func init() {
 
 	rollRuleMap[`disable_MinFirst`] = func(backLink []*Back) {
 		slices.SortStableFunc(backLink, func(a, b *Back) int {
-			return a.disableC/(a.Weight+1) - b.disableC/(b.Weight+1)
+			return int(a.disableC/(a.Weight+1) - b.disableC/(b.Weight+1))
 		})
 	}
 
 	rollRuleMap[`dealingC_MinFirst`] = func(backLink []*Back) {
 		slices.SortStableFunc(backLink, func(a, b *Back) int {
-			return a.dealingC/(a.Weight+1) - b.dealingC/(b.Weight+1)
+			return int(a.dealingC/(a.Weight+1) - b.dealingC/(b.Weight+1))
 		})
 	}
 
 	rollRuleMap[`chosenC_MinFirst`] = func(backLink []*Back) {
 		slices.SortStableFunc(backLink, func(a, b *Back) int {
-			return a.chosenC/(a.Weight+1) - b.chosenC/(b.Weight+1)
+			return int(a.chosenC/(a.Weight+1) - b.chosenC/(b.Weight+1))
+		})
+	}
+
+	rollRuleMap[`loop`] = func(backLink []*Back) {
+		slices.SortStableFunc(backLink, func(a, b *Back) int {
+			return a.index - b.index
 		})
 	}
 }
