@@ -70,7 +70,7 @@
           {
             "name": "b1",
             "to": "",
-            "weight": 1,
+            "weight": "1",
             "alwaysUp": false
           }
         ]
