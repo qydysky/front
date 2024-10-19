@@ -350,7 +350,6 @@ func (t *Back) SwapSign(logger Logger) {
 	} else {
 		t.verifyPeerCer, t.verifyPeerCerErr = os.ReadFile(path)
 	}
-	t.lastChosenT = time.Now()
 	t.AlwaysUp = len(t.route.Backs) == 1 || t.AlwaysUp
 }
 
