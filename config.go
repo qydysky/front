@@ -1,11 +1,13 @@
 package front
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -13,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/qydysky/front/dealer"
 	filiter "github.com/qydysky/front/filiter"
 	component2 "github.com/qydysky/part/component2"
@@ -28,9 +31,14 @@ type Config struct {
 		Pub string `json:"pub"`
 		Key string `json:"key"`
 	} `json:"tls"`
-	MatchRule  string               `json:"matchRule"`
-	CopyBlocks int                  `json:"copyBlocks"`
-	BlocksI    pslice.BlocksI[byte] `json:"-"`
+	RetryBlocks struct {
+		SizeB int `json:"sizeB"`
+		Num   int `json:"num"`
+	} `json:"retryBlocks"`
+	RetryBlocksI pslice.BlocksI[byte] `json:"-"`
+	MatchRule    string               `json:"matchRule"`
+	CopyBlocks   int                  `json:"copyBlocks"`
+	BlocksI      pslice.BlocksI[byte] `json:"-"`
 
 	routeP   pweb.WebPath
 	routeMap sync.Map `json:"-"`
@@ -70,6 +78,15 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 			t.CopyBlocks = 1000
 		}
 		t.BlocksI = pslice.NewBlocks[byte](16*1024, t.CopyBlocks)
+	}
+	if t.RetryBlocks.SizeB == 0 {
+		t.RetryBlocks.SizeB = humanize.MByte
+	}
+	if t.RetryBlocks.Num == 0 {
+		t.RetryBlocks.Num = 1000
+	}
+	if t.RetryBlocks.SizeB > 0 && t.RetryBlocks.Num > 0 {
+		t.RetryBlocksI = pslice.NewBlocks[byte](t.RetryBlocks.SizeB, t.RetryBlocks.Num)
 	}
 
 	syncWeb := pweb.NewSyncMap(&httpSer, &t.routeP, matchfunc)
@@ -168,6 +185,27 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					Deal(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
 				}
 
+				// repack
+				var reBuf []byte
+				if t.RetryBlocksI != nil && r.Body != nil {
+					var putBack func()
+					var e error
+					reBuf, putBack, e = t.RetryBlocksI.Get()
+					if e != nil {
+						logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyFail))
+						w.Header().Add(header+"Error", ErrReqReBodyFail.Error())
+						w.WriteHeader(http.StatusServiceUnavailable)
+						return
+					}
+					defer putBack()
+					if n, _ := r.Body.Read(reBuf); n == cap(reBuf) {
+						logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyOverflow))
+						w.Header().Add(header+"Error", ErrReqReBodyOverflow.Error())
+						w.WriteHeader(http.StatusServiceUnavailable)
+						return
+					}
+				}
+
 				for i := 0; i < len(backIs); i++ {
 					if !backIs[i].IsLive() {
 						continue
@@ -176,6 +214,10 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					backIs[i].lock.Lock()
 					backIs[i].lastChosenT = time.Now()
 					backIs[i].lock.Unlock()
+
+					if len(reBuf) != 0 {
+						r.Body = io.NopCloser(bytes.NewBuffer(reBuf))
+					}
 
 					if !strings.Contains(backIs[i].To, "://") {
 						e = component2.Get[reqDealer]("local").Deal(r.Context(), w, r, routePath, backIs[i], logger, t.BlocksI)
@@ -303,6 +345,13 @@ func (t *Route) SwapSign(logger Logger) {
 func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var backLink []*Back
 	for i := 0; i < len(t.Backs); i++ {
+		if ok, e := t.Backs[i].getFiliterReqUri().Match(r); ok && e == nil {
+			t.Backs[i].route = t
+			for k := uint(0); k < t.Backs[i].Weight; k++ {
+				backLink = append(backLink, &t.Backs[i])
+			}
+		}
+
 		if ok, e := t.Backs[i].getFiliterReqHeader().Match(r.Header); ok && e == nil {
 			t.Backs[i].route = t
 			for k := uint(0); k < t.Backs[i].Weight; k++ {
