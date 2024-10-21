@@ -31,7 +31,7 @@ func init() {
 
 	rollRuleMap[`loop`] = func(backLink []*Back) {
 		slices.SortStableFunc(backLink, func(a, b *Back) int {
-			return int(time.Since(a.lastChosenT).Milliseconds()/int64(a.Weight+1) - time.Since(b.lastChosenT).Milliseconds()/int64(b.Weight+1))
+			return int(time.Since(b.lastChosenT).Milliseconds()/int64(b.Weight+1) - time.Since(a.lastChosenT).Milliseconds()/int64(a.Weight+1))
 		})
 	}
 }
