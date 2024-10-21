@@ -3,6 +3,7 @@ package front
 import (
 	"math/rand/v2"
 	"slices"
+	"time"
 )
 
 var rollRuleMap = make(map[string]func(backLink []*Back))
@@ -30,7 +31,7 @@ func init() {
 
 	rollRuleMap[`loop`] = func(backLink []*Back) {
 		slices.SortStableFunc(backLink, func(a, b *Back) int {
-			return a.lastChosenT.Compare(b.lastChosenT)
+			return int(time.Since(a.lastChosenT).Milliseconds()/int64(a.Weight+1) - time.Since(b.lastChosenT).Milliseconds()/int64(b.Weight+1))
 		})
 	}
 }
