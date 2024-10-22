@@ -51,14 +51,6 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 		_ = done()
 	}()
 
-	var matchfunc func(path string) (func(w http.ResponseWriter, r *http.Request), bool)
-	switch t.MatchRule {
-	case "all":
-		matchfunc = t.routeP.Load
-	default:
-		matchfunc = t.routeP.LoadPerfix
-	}
-
 	httpSer := http.Server{
 		Addr:        t.Addr,
 		BaseContext: func(l net.Listener) context.Context { return ctx },
@@ -89,13 +81,49 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 		t.RetryBlocksI = pslice.NewBlocks[byte](t.RetryBlocks.SizeB, t.RetryBlocks.Num)
 	}
 
-	syncWeb := pweb.NewSyncMap(&httpSer, &t.routeP, matchfunc)
-	defer syncWeb.Shutdown()
+	defer logger.Info(`I:`, fmt.Sprintf("%v shutdown", t.Addr))
+
+	defer t.startServer(ctx, logger, &httpSer)()
 
 	t.SwapSign(ctx, logger)
 	logger.Info(`I:`, fmt.Sprintf("%v running", t.Addr))
 	<-ctx.Done()
-	logger.Info(`I:`, fmt.Sprintf("%v shutdown", t.Addr))
+}
+
+func (t *Config) startServer(ctx context.Context, logger Logger, conf *http.Server) (shutdown func(ctx ...context.Context)) {
+	shutdown = func(ctx ...context.Context) {}
+
+	var matchfunc func(path string) (func(w http.ResponseWriter, r *http.Request), bool)
+	switch t.MatchRule {
+	case "all":
+		matchfunc = t.routeP.Load
+	default:
+		matchfunc = t.routeP.LoadPerfix
+	}
+
+	var notice = sync.OnceFunc(func() {
+		logger.Warn(`W:`, `Address already in use. Wait Release...`)
+	})
+
+	timer := time.NewTicker(time.Millisecond * 100)
+	defer timer.Stop()
+
+	for {
+		syncWeb, err := pweb.NewSyncMapNoPanic(conf, &t.routeP, matchfunc)
+		if err == nil {
+			shutdown = syncWeb.Shutdown
+			return
+		} else if strings.Contains(err.Error(), `address already in use`) {
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
+				notice()
+			}
+		} else {
+			panic(err)
+		}
+	}
 }
 
 func (t *Config) SwapSign(ctx context.Context, logger Logger) {

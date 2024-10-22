@@ -2,6 +2,7 @@
 
 这是一个简单的http/https/ws/wss均衡负载、故障转移路由/代理，通过定时刷新配置不中断地：
 
+- 监听占用等待
 - 动态后端
 - 路径继承
 - 自定权重
@@ -19,12 +20,12 @@
 config:
 
 - *addr*: string 监听端口 例：`0.0.0.0:8081`
-- *matchRule*: string 匹配规则 `prefix`：当未匹配到时，返回最近的/匹配， `all`：当未匹配到时，返回404
+- *matchRule*: string 匹配规则，默认`prefix`。 `prefix`：当未匹配到时，返回最近的/匹配， `all`：当未匹配到时，返回404
 - *copyBlocks*: int 转发的块数量，默认`1000`
 - *retryBlocks*: {} 重试
     - *sizeB*: int 重试的块大小，默认`1000000`
     - *num*: int 重试的块数量，默认`1000`，为`-1`时停用重试
-- *tls*: {} 启用tls
+- *tls*: {} 启用tls, 默认空
     - *pub*: string 公钥pem路径
     - *key*: string 私钥pem路径
 - routes: [] 路由
