@@ -353,6 +353,10 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 			continue
 		}
 
+		if !t.Backs[i].AlwaysUp && t.Backs[i].Weight == 0 {
+			continue
+		}
+
 		t.Backs[i].route = t
 		backLink = append(backLink, &t.Backs[i])
 	}
