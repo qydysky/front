@@ -352,6 +352,9 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 		if ok, e := t.Backs[i].getFiliterReqHeader().Match(r.Header); !ok || e != nil {
 			continue
 		}
+
+		t.Backs[i].route = t
+		backLink = append(backLink, &t.Backs[i])
 	}
 
 	if f, ok := rollRuleMap[t.RollRule]; ok {
