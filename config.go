@@ -101,9 +101,7 @@ func (t *Config) startServer(ctx context.Context, logger Logger, conf *http.Serv
 		matchfunc = t.routeP.LoadPerfix
 	}
 
-	var notice = sync.OnceFunc(func() {
-		logger.Warn(`W:`, `Address already in use. Wait Release...`)
-	})
+	var hasErr = false
 
 	timer := time.NewTicker(time.Millisecond * 100)
 	defer timer.Stop()
@@ -113,15 +111,16 @@ func (t *Config) startServer(ctx context.Context, logger Logger, conf *http.Serv
 		if err == nil {
 			shutdown = syncWeb.Shutdown
 			return
-		} else if strings.Contains(err.Error(), `address already in use`) {
+		} else {
 			select {
 			case <-ctx.Done():
 				return
 			case <-timer.C:
-				notice()
+				if !hasErr {
+					hasErr = true
+					logger.Warn(`W:`, fmt.Sprintf("%v. Retry...", err))
+				}
 			}
-		} else {
-			panic(err)
 		}
 	}
 }
