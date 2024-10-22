@@ -345,18 +345,12 @@ func (t *Route) SwapSign(logger Logger) {
 func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var backLink []*Back
 	for i := 0; i < len(t.Backs); i++ {
-		if ok, e := t.Backs[i].getFiliterReqUri().Match(r); ok && e == nil {
-			t.Backs[i].route = t
-			for k := uint(0); k < t.Backs[i].Weight; k++ {
-				backLink = append(backLink, &t.Backs[i])
-			}
+		if ok, e := t.Backs[i].getFiliterReqUri().Match(r); !ok || e != nil {
+			continue
 		}
 
-		if ok, e := t.Backs[i].getFiliterReqHeader().Match(r.Header); ok && e == nil {
-			t.Backs[i].route = t
-			for k := uint(0); k < t.Backs[i].Weight; k++ {
-				backLink = append(backLink, &t.Backs[i])
-			}
+		if ok, e := t.Backs[i].getFiliterReqHeader().Match(r.Header); !ok || e != nil {
+			continue
 		}
 	}
 
