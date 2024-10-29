@@ -24,7 +24,7 @@ config:
 - *copyBlocks*: int 转发的块数量，默认`1000`
 - *retryBlocks*: {} 重试
     - *sizeB*: int 重试的块大小，默认`1000000`
-    - *num*: int 重试的块数量，默认`1000`，为`-1`时停用重试
+    - *num*: int 重试的块数量，默认`0`，为`0`时停用重试
 - *tls*: {} 启用tls, 默认空
     - *pub*: string 公钥pem路径
     - *key*: string 私钥pem路径
@@ -62,7 +62,7 @@ setting: json配置不需要setting
 
 - filiter:
     - reqUri: 请求后端前，请求路径过滤器
-        - accessRule: 布尔表达式，为true时才通过
+        - accessRule: 布尔表达式，为true时才通过,例`{id}|(!{id2}&{id3})`
         - items: map[string]string
             - id: matchExp
     - reqHeader: 请求后端前，请求头处理器

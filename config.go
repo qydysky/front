@@ -74,9 +74,6 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 	if t.RetryBlocks.SizeB == 0 {
 		t.RetryBlocks.SizeB = humanize.MByte
 	}
-	if t.RetryBlocks.Num == 0 {
-		t.RetryBlocks.Num = 1000
-	}
 	if t.RetryBlocks.SizeB > 0 && t.RetryBlocks.Num > 0 {
 		t.RetryBlocksI = pslice.NewBlocks[byte](t.RetryBlocks.SizeB, t.RetryBlocks.Num)
 	}
