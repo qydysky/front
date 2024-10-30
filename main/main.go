@@ -24,7 +24,6 @@ func main() {
 	// 获取config路径
 	configP := flag.String("c", "main.json", "config")
 	logfile := flag.String("log", "main.log", "logfile")
-	testP := flag.Int("t", 0, "test port")
 	_ = flag.Bool("q", false, "no log")
 	_ = flag.Bool("dq", false, "no debug log")
 	flag.Parse()
@@ -71,9 +70,6 @@ func main() {
 	if e := pfront.LoadPeriod(ctx, buf, configF, &configS, logger); e != nil {
 		return
 	}
-
-	// 测试响应
-	go pfront.Test(ctx, *testP, logger.Base("测试"))
 
 	for i := 0; i < len(configS); i++ {
 		go configS[i].Run(ctx, logger)

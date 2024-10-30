@@ -15,6 +15,59 @@
 
 支持嵌入到其他项目中/独立运行
 
+示例
+```json
+[
+    {
+        "addr": "127.0.0.1:10000",
+        "routes": [
+            {
+                "path": ["/"],
+                "pathAdd": true,
+                "filiter": {
+                    "reqUri": {
+                        "accessRule": "!{stop}",
+                        "items": {
+                            "stop": "(main\\.json)"
+                        }
+                    }
+                },
+                "backs": [
+                    {
+                        "name": "back1",
+                        "to": "./",
+                        "weight": "1"
+                    }
+                ]
+            }
+        ]
+    }
+]
+```
+```
+curl http://127.0.0.1:10000/
+<!doctype html>
+<meta name="viewport" content="width=device-width">
+<pre>
+<a href="front.run">front.run</a>
+<a href="main.json">main.json</a>
+<a href="main.log">main.log</a>
+</pre>
+
+curl http://127.0.0.1:10000/main.json -I
+HTTP/1.1 403 Forbidden
+X-Front-Error: ErrPatherCheckFail
+Date: Wed, 30 Oct 2024 17:50:22 GMT
+
+curl http://127.0.0.1:10000/main.log -I
+HTTP/1.1 200 OK
+Accept-Ranges: bytes
+Content-Length: 1700014
+Content-Type: text/x-log; charset=utf-8
+Last-Modified: Wed, 30 Oct 2024 17:51:23 GMT
+Date: Wed, 30 Oct 2024 17:51:23 GMT
+```
+
 配置为json数组格式[]，下面为数组中的其中一个{}，下述字段*倾斜*的，表示不会根据配置动态加载
 
 config:
