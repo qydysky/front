@@ -22,7 +22,7 @@ config:
 - *addr*: string 监听端口 例：`0.0.0.0:8081`
 - *matchRule*: string 匹配规则，默认`prefix`。 `prefix`：当未匹配到时，返回最近的/匹配， `all`：当未匹配到时，返回404
 - *copyBlocks*: int 转发的块数量，默认`1000`
-- *retryBlocks*: {} 重试
+- *retryBlocks*: {} 重试, 当停用时，分配仅进行一次
     - *sizeB*: int 重试的块大小，默认`1000000`
     - *num*: int 重试的块数量，默认`0`，为`0`时停用重试
 - *tls*: {} 启用tls, 默认空

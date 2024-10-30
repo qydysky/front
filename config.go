@@ -256,6 +256,11 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						break
 					}
 
+					// no retryBuf
+					if len(reBuf) == 0 {
+						break
+					}
+
 					// some err can retry
 					if v, ok := e.(ErrCanRetry); !ok || !v.CanRetry {
 						break
