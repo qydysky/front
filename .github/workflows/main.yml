@@ -41,6 +41,7 @@ jobs:
       run: |
         cd main
         go get .
+        go test -count 1 -timeout 30s -v .
         CGO_ENABLED=0 go build -pgo=auto -v -buildmode=exe main.go
       
     - name: zip
