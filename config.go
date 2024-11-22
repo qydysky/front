@@ -171,28 +171,38 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 				var backIs []*Back
 
-				backIs = append(backIs, route.FiliterBackByRequest(r)...)
+				{
+					if t, e := r.Cookie("_psign_" + cookie); e == nil {
+						if backP, aok := route.backMap.Load(t.Value); aok {
 
-				if t, e := r.Cookie("_psign_" + cookie); e == nil {
-					if backP, aok := route.backMap.Load(t.Value); aok {
+							if ok, e := backP.(*Back).getFiliterReqUri().Match(r); e != nil {
+								logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+							} else if ok {
+								aok = false
+							}
 
-						if ok, e := backP.(*Back).getFiliterReqUri().Match(r); e != nil {
-							logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
-						} else if ok {
-							aok = false
-						}
+							if ok, e := backP.(*Back).getFiliterReqHeader().Match(r.Header); e != nil {
+								logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+							} else if ok {
+								aok = false
+							}
 
-						if ok, e := backP.(*Back).getFiliterReqHeader().Match(r.Header); e != nil {
-							logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
-						} else if ok {
-							aok = false
-						}
-
-						if aok {
-							for i := uint(0); i < backP.(*Back).Weight; i++ {
-								backIs = append(backIs, backP.(*Back))
+							if aok {
+								for i := uint(0); i < backP.(*Back).Weight; i++ {
+									backIs = append(backIs, backP.(*Back))
+								}
 							}
 						}
+					}
+
+					var splicingC = len(backIs)
+
+					backIs = append(backIs, route.FiliterBackByRequest(r)...)
+
+					if f, ok := rollRuleMap[route.RollRule]; ok {
+						f(backIs[splicingC:])
+					} else {
+						rand_Shuffle(backIs[splicingC:])
 					}
 				}
 
@@ -388,12 +398,6 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 
 		t.Backs[i].route = t
 		backLink = append(backLink, &t.Backs[i])
-	}
-
-	if f, ok := rollRuleMap[t.RollRule]; ok {
-		f(backLink)
-	} else {
-		rand_Shuffle(backLink)
 	}
 
 	return backLink
