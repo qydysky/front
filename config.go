@@ -185,7 +185,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 								return nil, true
 							}
 
-							if e, ok := filiter(); e != nil {
+							if e, ok := filiter(backP.(*Back)); e != nil {
 								logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 							} else if ok {
 								for i := uint(0); i < backP.(*Back).Weight; i++ {
