@@ -171,6 +171,8 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 				var backIs []*Back
 
+				backIs = append(backIs, route.FiliterBackByRequest(r)...)
+
 				if t, e := r.Cookie("_psign_" + cookie); e == nil {
 					if backP, aok := route.backMap.Load(t.Value); aok {
 
@@ -193,8 +195,6 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						}
 					}
 				}
-
-				backIs = append(backIs, route.FiliterBackByRequest(r)...)
 
 				if len(backIs) == 0 {
 					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrNoRoute))
