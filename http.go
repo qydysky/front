@@ -123,11 +123,11 @@ func (httpDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		defer chosenBack.ed()
 	}
 
-	if chosenBack.Splicing() != 0 {
+	if chosenBack.getSplicing() != 0 {
 		cookie := &http.Cookie{
 			Name:   "_psign_" + cookie,
 			Value:  chosenBack.Id(),
-			MaxAge: chosenBack.Splicing(),
+			MaxAge: chosenBack.getSplicing(),
 			Path:   "/",
 		}
 		if utils.ValidCookieDomain(r.Host) {

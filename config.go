@@ -439,8 +439,11 @@ func (t *Back) SwapSign(logger Logger) {
 	t.AlwaysUp = len(t.route.Backs) == 1 || t.AlwaysUp
 }
 
-func (t *Back) Splicing() int {
-	return t.route.Splicing
+func (t *Back) getSplicing() int {
+	if t.Splicing == 0 {
+		return t.route.Splicing
+	}
+	return t.Splicing
 }
 func (t *Back) PathAdd() bool {
 	return t.route.PathAdd
