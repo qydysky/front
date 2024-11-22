@@ -174,20 +174,20 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 				{
 					if t, e := r.Cookie("_psign_" + cookie); e == nil {
 						if backP, aok := route.backMap.Load(t.Value); aok {
+							var filiter = func(b *Back) (error, bool) {
+								if ok, e := b.getFiliterReqUri().Match(r); e != nil || !ok {
+									return e, ok
+								}
 
-							if ok, e := backP.(*Back).getFiliterReqUri().Match(r); e != nil {
-								logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
-							} else if ok {
-								aok = false
+								if ok, e := b.getFiliterReqHeader().Match(r.Header); e != nil || !ok {
+									return e, ok
+								}
+								return nil, true
 							}
 
-							if ok, e := backP.(*Back).getFiliterReqHeader().Match(r.Header); e != nil {
+							if e, ok := filiter(); e != nil {
 								logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 							} else if ok {
-								aok = false
-							}
-
-							if aok {
 								for i := uint(0); i < backP.(*Back).Weight; i++ {
 									backIs = append(backIs, backP.(*Back))
 								}

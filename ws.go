@@ -115,10 +115,10 @@ func (wsDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Request
 		if utils.ValidCookieDomain(r.Host) {
 			cookie.Domain = r.Host
 		}
-		w.Header().Add("Set-Cookie", (cookie).String())
+		w.Header().Set("Set-Cookie", (cookie).String())
 	}
 
-	w.Header().Add(header+"Info", cookie+";"+chosenBack.Name)
+	w.Header().Set(header+"Info", cookie+";"+chosenBack.Name)
 
 	defer conn.Close()
 

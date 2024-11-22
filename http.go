@@ -133,10 +133,10 @@ func (httpDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		if utils.ValidCookieDomain(r.Host) {
 			cookie.Domain = r.Host
 		}
-		w.Header().Add("Set-Cookie", (cookie).String())
+		w.Header().Set("Set-Cookie", (cookie).String())
 	}
 
-	w.Header().Add(header+"Info", cookie+";"+chosenBack.Name)
+	w.Header().Set(header+"Info", cookie+";"+chosenBack.Name)
 
 	// if e :=
 	copyHeader(resp.Header, w.Header(), chosenBack.getDealerResHeader())
