@@ -7,16 +7,15 @@
       "pub": "",
       "key": ""
     },
+    "retryBlocks": {
+      "sizeB": 10,
+      "num": 10
+    },
     "routes": [
       {
         "path": [""],
         "pathAdd": false,
         "rollRule": "",
-        "reqBody": {
-          "action": "",
-          "reqSize": "1M",
-          "matchExp": ""
-        },
         "splicing": 0,
         "errToSec": 0,
         "errBanSec": 0,
@@ -46,6 +45,11 @@
                 "matchExp": ""
               }
             }
+          },
+          "reqBody": {
+            "action": "",
+            "reqSize": "1M",
+            "matchExp": ""
           }
         },
         "dealer": {

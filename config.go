@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -32,8 +33,9 @@ type Config struct {
 		Key string `json:"key"`
 	} `json:"tls"`
 	RetryBlocks struct {
-		SizeB int `json:"sizeB"`
-		Num   int `json:"num"`
+		Size string `json:"size"`
+		size int    `json:"-"`
+		Num  int    `json:"num"`
 	} `json:"retryBlocks"`
 	RetryBlocksI pslice.BlocksI[byte] `json:"-"`
 	MatchRule    string               `json:"matchRule"`
@@ -71,11 +73,13 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 		}
 		t.BlocksI = pslice.NewBlocks[byte](16*1024, t.CopyBlocks)
 	}
-	if t.RetryBlocks.SizeB == 0 {
-		t.RetryBlocks.SizeB = humanize.MByte
+	if size, err := humanize.ParseBytes(t.RetryBlocks.Size); err != nil || size < humanize.MByte {
+		t.RetryBlocks.size = humanize.MByte
+	} else {
+		t.RetryBlocks.size = int(size)
 	}
-	if t.RetryBlocks.SizeB > 0 && t.RetryBlocks.Num > 0 {
-		t.RetryBlocksI = pslice.NewBlocks[byte](t.RetryBlocks.SizeB, t.RetryBlocks.Num)
+	if t.RetryBlocks.size > 0 && t.RetryBlocks.Num > 0 {
+		t.RetryBlocksI = pslice.NewBlocks[byte](t.RetryBlocks.size, t.RetryBlocks.Num)
 	}
 
 	defer logger.Info(`I:`, fmt.Sprintf("%v shutdown", t.Addr))
@@ -160,7 +164,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					return
 				}
 
-				if ok, e := route.ReqBody.Match(r); e != nil {
+				if ok, e := route.Filiter.ReqBody.Match(r); e != nil {
 					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 				} else if !ok {
 					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrBodyCheckFail))
@@ -210,59 +214,65 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 				}
 
 				// repack
-				var reBuf []byte
+				var (
+					reqBuf     []byte
+					reqBufUsed bool
+				)
 				if t.RetryBlocksI != nil && r.Body != nil {
-					var putBack func()
-					var e error
-					reBuf, putBack, e = t.RetryBlocksI.Get()
-					if e != nil {
-						logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyFail))
-						w.Header().Add(header+"Error", ErrReqReBodyFail.Error())
-						w.WriteHeader(http.StatusServiceUnavailable)
-						return
-					}
-					defer putBack()
-					if n, _ := r.Body.Read(reBuf); n == cap(reBuf) {
-						logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyOverflow))
-						w.Header().Add(header+"Error", ErrReqReBodyOverflow.Error())
-						w.WriteHeader(http.StatusServiceUnavailable)
-						return
+					if contentLength := r.Header.Get("Content-Length"); contentLength != "" {
+						if len, e := strconv.Atoi(contentLength); e == nil && t.RetryBlocks.size >= len {
+							var putBack func()
+							var e error
+							reqBuf, putBack, e = t.RetryBlocksI.Get()
+							if e == nil {
+								defer putBack()
+								reqBufUsed = true
+								_, _ = r.Body.Read(reqBuf)
+								// if n, _ := r.Body.Read(reqBuf); n == cap(reqBuf) {
+								// logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyOverflow))
+								// 	w.Header().Add(header+"Error", ErrReqReBodyOverflow.Error())
+								// 	w.WriteHeader(http.StatusServiceUnavailable)
+								// 	return
+								// }
+								// logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyFail))
+								// w.Header().Add(header+"Error", ErrReqReBodyFail.Error())
+								// w.WriteHeader(http.StatusServiceUnavailable)
+								// return
+							} else {
+								logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyOverflow))
+							}
+						}
 					}
 				}
 
-				for i := 0; i < len(backIs); i++ {
-					if !backIs[i].IsLive() {
+				for _, backP := range backIs {
+					if !backP.IsLive() {
 						continue
 					}
 
-					backIs[i].lock.Lock()
-					backIs[i].lastChosenT = time.Now()
-					backIs[i].lock.Unlock()
+					backP.lock.Lock()
+					backP.lastChosenT = time.Now()
+					backP.lock.Unlock()
 
-					if len(reBuf) != 0 {
-						r.Body = io.NopCloser(bytes.NewBuffer(reBuf))
+					if reqBufUsed {
+						r.Body = io.NopCloser(bytes.NewBuffer(reqBuf))
 					}
 
-					if !strings.Contains(backIs[i].To, "://") {
-						e = component2.Get[reqDealer]("local").Deal(r.Context(), w, r, routePath, backIs[i], logger, t.BlocksI)
+					if !strings.Contains(backP.To, "://") {
+						e = component2.Get[reqDealer]("local").Deal(r.Context(), w, r, routePath, backP, logger, t.BlocksI)
 					} else if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
-						e = component2.Get[reqDealer]("ws").Deal(r.Context(), w, r, routePath, backIs[i], logger, t.BlocksI)
+						e = component2.Get[reqDealer]("ws").Deal(r.Context(), w, r, routePath, backP, logger, t.BlocksI)
 					} else {
-						e = component2.Get[reqDealer]("http").Deal(r.Context(), w, r, routePath, backIs[i], logger, t.BlocksI)
+						e = component2.Get[reqDealer]("http").Deal(r.Context(), w, r, routePath, backP, logger, t.BlocksI)
 					}
 
-					// no err
 					if e == nil {
+						// no err
 						break
 					}
 
-					// no retryBuf
-					if len(reBuf) == 0 {
-						break
-					}
-
-					// some err can retry
 					if v, ok := e.(ErrCanRetry); !ok || !v.CanRetry {
+						// some err can't retry
 						break
 					}
 				}
@@ -329,9 +339,9 @@ type Route struct {
 	config *Config  `json:"-"`
 	Path   []string `json:"path"`
 
-	PathAdd  bool         `json:"pathAdd"`
-	RollRule string       `json:"rollRule"`
-	ReqBody  filiter.Body `json:"reqBody"`
+	PathAdd  bool   `json:"pathAdd"`
+	RollRule string `json:"rollRule"`
+	// ReqBody  filiter.Body `json:"reqBody"`
 	Setting
 
 	backMap sync.Map `json:"-"`
@@ -482,6 +492,14 @@ func (t *Back) getFiliterResHeader() *filiter.Header {
 		return &t.Filiter.ResHeader
 	}
 }
+
+//	func (t *Back) getFiliterResBody() *filiter.Body {
+//		if !t.Filiter.ReqBody.Valid() {
+//			return &t.route.Filiter.ReqBody
+//		} else {
+//			return &t.Filiter.ReqBody
+//		}
+//	}
 func (t *Back) getDealerReqUri() []dealer.UriDealer {
 	return append(t.route.Dealer.ReqUri, t.Dealer.ReqUri...)
 }

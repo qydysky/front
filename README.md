@@ -75,8 +75,8 @@ config:
 - *addr*: string 监听端口 例：`0.0.0.0:8081`
 - *matchRule*: string 匹配规则，默认`prefix`。 `prefix`：当未匹配到时，返回最近的/匹配， `all`：当未匹配到时，返回404
 - *copyBlocks*: int 转发的块数量，默认`1000`
-- *retryBlocks*: {} 重试, 当停用时，分配仅进行一次
-    - *sizeB*: int 重试的块大小，默认`1000000`
+- *retryBlocks*: {} 重试, 当停用时，分配仅进行一次。当所有块都在使用中时，跳过。当请求没有`Content-Length`时，跳过。
+    - *size*: string 重试的块大小，默认`1M`
     - *num*: int 重试的块数量，默认`0`，为`0`时停用重试
 - *tls*: {} 启用tls, 默认空
     - *pub*: string 公钥pem路径
@@ -91,10 +91,6 @@ config:
         - `dealingC_MinFirst`(连接数较少的优先)
         - `chosenC_MinFirst`(被选择较少的优先)
         - (使用rand.Shuffle随机，默认)
-    - reqBody: 请求后端前，请求数据过滤器
-        - action: string 可选`access`、`deny`。
-        - reqSize: string 限定请求数据大小，默认为`1M`
-        - matchExp: string `access`时如不匹配将结束请求。`deny`时如匹配将结束请求。
     - setting... 将会给backs默认值
     - backs: [] 后端
         - name: string 后端名称，将在日志中显示
@@ -105,7 +101,7 @@ config:
         - alwaysUp: bool 总是在线， 当只有一个后端时，默认为true
         - setting...
 
-setting: json配置不需要setting
+setting: setting代指下述各配置
 
 - splicing: int 当客户端支持cookie时，将会固定使用后端多少秒，默认不启用
 - errToSec: float64 当后端响应超过(ws则指初次返回时间)指定秒，将会触发errBanSec
@@ -130,6 +126,11 @@ setting: json配置不需要setting
             - id:
                 - key: string header头
                 - matchExp: string
+    - reqBody: 请求后端前，请求数据过滤器(仅route层有效)
+        - action: string 可选`access`、`deny`
+        - reqSize: string 限定请求数据大小，默认为`1M`
+        - matchExp: string `access`时如不匹配将结束请求。`deny`时如匹配将结束请求
+
 - dealer:
     - reqUri:[] 请求后端前，路径处理器
         - action: string 可选`replace`。
