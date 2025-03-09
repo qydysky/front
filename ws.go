@@ -105,20 +105,20 @@ func (wsDealer) Deal(ctx context.Context, w http.ResponseWriter, r *http.Request
 		defer chosenBack.ed()
 	}
 
-	if chosenBack.Splicing() != 0 {
+	if chosenBack.getSplicing() != 0 {
 		cookie := &http.Cookie{
 			Name:   "_psign_" + cookie,
 			Value:  chosenBack.Id(),
-			MaxAge: chosenBack.Splicing(),
+			MaxAge: chosenBack.getSplicing(),
 			Path:   "/",
 		}
 		if utils.ValidCookieDomain(r.Host) {
 			cookie.Domain = r.Host
 		}
-		w.Header().Add("Set-Cookie", (cookie).String())
+		w.Header().Set("Set-Cookie", (cookie).String())
 	}
 
-	w.Header().Add(header+"Info", cookie+";"+chosenBack.Name)
+	w.Header().Set(header+"Info", cookie+";"+chosenBack.Name)
 
 	defer conn.Close()
 

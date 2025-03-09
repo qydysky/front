@@ -175,30 +175,40 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 				var backIs []*Back
 
-				if t, e := r.Cookie("_psign_" + cookie); e == nil {
-					if backP, aok := route.backMap.Load(t.Value); aok {
+				{
+					if t, e := r.Cookie("_psign_" + cookie); e == nil {
+						if backP, aok := route.backMap.Load(t.Value); aok {
+							var filiter = func(b *Back) (error, bool) {
+								if ok, e := b.getFiliterReqUri().Match(r); e != nil || !ok {
+									return e, ok
+								}
 
-						if ok, e := backP.(*Back).getFiliterReqUri().Match(r); e != nil {
-							logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
-						} else if ok {
-							aok = false
-						}
+								if ok, e := b.getFiliterReqHeader().Match(r.Header); e != nil || !ok {
+									return e, ok
+								}
+								return nil, true
+							}
 
-						if ok, e := backP.(*Back).getFiliterReqHeader().Match(r.Header); e != nil {
-							logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
-						} else if ok {
-							aok = false
-						}
-
-						if aok {
-							for i := uint(0); i < backP.(*Back).Weight; i++ {
-								backIs = append(backIs, backP.(*Back))
+							if e, ok := filiter(backP.(*Back)); e != nil {
+								logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+							} else if ok {
+								for i := uint(0); i < backP.(*Back).Weight; i++ {
+									backIs = append(backIs, backP.(*Back))
+								}
 							}
 						}
 					}
-				}
 
-				backIs = append(backIs, route.FiliterBackByRequest(r)...)
+					var splicingC = len(backIs)
+
+					backIs = append(backIs, route.FiliterBackByRequest(r)...)
+
+					if f, ok := rollRuleMap[route.RollRule]; ok {
+						f(backIs[splicingC:])
+					} else {
+						rand_Shuffle(backIs[splicingC:])
+					}
+				}
 
 				if len(backIs) == 0 {
 					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrNoRoute))
@@ -400,12 +410,6 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 		backLink = append(backLink, &t.Backs[i])
 	}
 
-	if f, ok := rollRuleMap[t.RollRule]; ok {
-		f(backLink)
-	} else {
-		rand_Shuffle(backLink)
-	}
-
 	return backLink
 }
 
@@ -445,8 +449,11 @@ func (t *Back) SwapSign(logger Logger) {
 	t.AlwaysUp = len(t.route.Backs) == 1 || t.AlwaysUp
 }
 
-func (t *Back) Splicing() int {
-	return t.route.Splicing
+func (t *Back) getSplicing() int {
+	if t.Splicing == 0 {
+		return t.route.Splicing
+	}
+	return t.Splicing
 }
 func (t *Back) PathAdd() bool {
 	return t.route.PathAdd
