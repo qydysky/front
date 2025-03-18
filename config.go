@@ -47,7 +47,8 @@ type Config struct {
 	routeMap sync.Map `json:"-"`
 	Routes   []Route  `json:"routes"`
 
-	reqId atomic.Int64 `json:"-"`
+	ReqIdLoop int          `json:"reqIdLoop"`
+	reqId     atomic.Int64 `json:"-"`
 }
 
 func (t *Config) Run(ctx context.Context, logger Logger) {
@@ -69,6 +70,9 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 				NextProtos:   []string{"h2", "http/1.1"},
 			}
 		}
+	}
+	if t.ReqIdLoop == 0 {
+		t.ReqIdLoop = 1000
 	}
 	if t.BlocksI == nil {
 		if t.CopyBlocks == 0 {
@@ -142,7 +146,11 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 		for _, routePath := range route.Path {
 			t.routeP.Store(routePath, func(w http.ResponseWriter, r *http.Request) {
+
 				reqId := t.reqId.Add(1)
+				if reqId >= int64(t.ReqIdLoop) {
+					t.reqId.Store(0)
+				}
 
 				if len(r.RequestURI) > 8000 {
 					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrUriTooLong))
