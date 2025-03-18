@@ -237,7 +237,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 							if e == nil {
 								defer putBack()
 								reqBufUsed = true
-								n, _ := 
+								n, _ := r.Body.Read(reqBuf)
 								reqBuf = reqBuf[:n]
 								// if n, _ := r.Body.Read(reqBuf); n == cap(reqBuf) {
 								// logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyOverflow))
