@@ -286,7 +286,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						// some err can't retry
 						break
 					}
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrCanRetry{}))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqRetry))
 				}
 
 				if e != nil {
