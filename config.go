@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -45,6 +46,8 @@ type Config struct {
 	routeP   pweb.WebPath
 	routeMap sync.Map `json:"-"`
 	Routes   []Route  `json:"routes"`
+
+	reqId atomic.Int64 `json:"-"`
 }
 
 func (t *Config) Run(ctx context.Context, logger Logger) {
@@ -135,39 +138,41 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 		logger.Info(`I:`, fmt.Sprintf("%v > %v", t.Addr, k))
 		t.routeMap.Store(k, route)
 
-		var logFormat = "%v %v%v %v %v"
+		var logFormat = "%d %v %v%v %v %v"
 
 		for _, routePath := range route.Path {
 			t.routeP.Store(routePath, func(w http.ResponseWriter, r *http.Request) {
+				reqId := t.reqId.Add(1)
+
 				if len(r.RequestURI) > 8000 {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrUriTooLong))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrUriTooLong))
 					w.Header().Add(header+"Error", ErrUriTooLong.Error())
 					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
 
 				if ok, e := route.Filiter.ReqUri.Match(r); e != nil {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 				} else if !ok {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrPatherCheckFail))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrPatherCheckFail))
 					w.Header().Add(header+"Error", ErrPatherCheckFail.Error())
 					w.WriteHeader(http.StatusForbidden)
 					return
 				}
 
 				if ok, e := route.Filiter.ReqHeader.Match(r.Header); e != nil {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 				} else if !ok {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrHeaderCheckFail))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrHeaderCheckFail))
 					w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
 					w.WriteHeader(http.StatusForbidden)
 					return
 				}
 
 				if ok, e := route.Filiter.ReqBody.Match(r); e != nil {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 				} else if !ok {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrBodyCheckFail))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrBodyCheckFail))
 					w.Header().Add(header+"Error", ErrBodyCheckFail.Error())
 					w.WriteHeader(http.StatusForbidden)
 					return
@@ -190,7 +195,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 							}
 
 							if e, ok := filiter(backP.(*Back)); e != nil {
-								logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+								logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 							} else if ok {
 								for i := uint(0); i < backP.(*Back).Weight; i++ {
 									backIs = append(backIs, backP.(*Back))
@@ -211,7 +216,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 				}
 
 				if len(backIs) == 0 {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrNoRoute))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrNoRoute))
 					w.Header().Add(header+"Error", ErrNoRoute.Error())
 					w.WriteHeader(http.StatusNotFound)
 					return
@@ -220,7 +225,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 				var e error = ErrAllBacksFail
 
 				type reqDealer interface {
-					Deal(ctx context.Context, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
+					Deal(ctx context.Context, reqId int64, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
 				}
 
 				// repack
@@ -239,18 +244,8 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 								reqBufUsed = true
 								n, _ := r.Body.Read(reqBuf)
 								reqBuf = reqBuf[:n]
-								// if n, _ := r.Body.Read(reqBuf); n == cap(reqBuf) {
-								// logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyOverflow))
-								// 	w.Header().Add(header+"Error", ErrReqReBodyOverflow.Error())
-								// 	w.WriteHeader(http.StatusServiceUnavailable)
-								// 	return
-								// }
-								// logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyFail))
-								// w.Header().Add(header+"Error", ErrReqReBodyFail.Error())
-								// w.WriteHeader(http.StatusServiceUnavailable)
-								// return
 							} else {
-								logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyOverflow))
+								logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyOverflow))
 							}
 						}
 					}
@@ -270,11 +265,11 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					}
 
 					if !strings.Contains(backP.To, "://") {
-						e = component2.Get[reqDealer]("local").Deal(r.Context(), w, r, routePath, backP, logger, t.BlocksI)
+						e = component2.Get[reqDealer]("local").Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.BlocksI)
 					} else if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
-						e = component2.Get[reqDealer]("ws").Deal(r.Context(), w, r, routePath, backP, logger, t.BlocksI)
+						e = component2.Get[reqDealer]("ws").Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.BlocksI)
 					} else {
-						e = component2.Get[reqDealer]("http").Deal(r.Context(), w, r, routePath, backP, logger, t.BlocksI)
+						e = component2.Get[reqDealer]("http").Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.BlocksI)
 					}
 
 					if e == nil {
@@ -286,7 +281,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						// some err can't retry
 						break
 					}
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqRetry))
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqRetry))
 				}
 
 				if e != nil {
