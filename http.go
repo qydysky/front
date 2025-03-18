@@ -18,7 +18,7 @@ import (
 
 func init() {
 	type I interface {
-		Deal(ctx context.Context, reqId int64, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
+		Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
 	}
 	if e := component2.Register[I]("http", httpDealer{}); e != nil {
 		panic(e)
@@ -27,7 +27,7 @@ func init() {
 
 type httpDealer struct{}
 
-func (httpDealer) Deal(ctx context.Context, reqId int64, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
+func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	var (
 		opT       = time.Now()
 		resp      *http.Response

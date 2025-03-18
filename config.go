@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -47,8 +48,8 @@ type Config struct {
 	routeMap sync.Map `json:"-"`
 	Routes   []Route  `json:"routes"`
 
-	ReqIdLoop int          `json:"reqIdLoop"`
-	reqId     atomic.Int64 `json:"-"`
+	ReqIdLoop int           `json:"reqIdLoop"`
+	reqId     atomic.Uint32 `json:"-"`
 }
 
 func (t *Config) Run(ctx context.Context, logger Logger) {
@@ -71,9 +72,12 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 			}
 		}
 	}
-	if t.ReqIdLoop == 0 {
+	if t.ReqIdLoop <= 0 {
 		t.ReqIdLoop = 1000
+	} else if t.ReqIdLoop > math.MaxUint32 {
+		t.ReqIdLoop = math.MaxUint32
 	}
+
 	if t.BlocksI == nil {
 		if t.CopyBlocks == 0 {
 			t.CopyBlocks = 1000
@@ -148,7 +152,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 			t.routeP.Store(routePath, func(w http.ResponseWriter, r *http.Request) {
 
 				reqId := t.reqId.Add(1)
-				if reqId >= int64(t.ReqIdLoop) {
+				if reqId >= uint32(t.ReqIdLoop) {
 					t.reqId.Store(0)
 				}
 
@@ -233,7 +237,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 				var e error = ErrAllBacksFail
 
 				type reqDealer interface {
-					Deal(ctx context.Context, reqId int64, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
+					Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
 				}
 
 				// repack

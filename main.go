@@ -185,7 +185,7 @@ var (
 	ErrCopy              = errors.New("ErrCopy")
 	ErrReqReBodyFail     = errors.New("ErrReqReBodyFail")
 	ErrReqReBodyOverflow = errors.New("ErrReqReBodyOverflow")
-	ErrReqRetry = errors.New("ErrReqRetry")
+	ErrReqRetry          = errors.New("ErrReqRetry")
 	ErrReqCreFail        = errors.New("ErrReqCreFail")
 	ErrReqDoFail         = errors.New("ErrReqDoFail")
 	ErrResDoFail         = errors.New("ErrResDoFail")

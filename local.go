@@ -16,7 +16,7 @@ import (
 
 func init() {
 	type I interface {
-		Deal(ctx context.Context, reqId int64, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
+		Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
 	}
 	if e := component2.Register[I]("local", localDealer{}); e != nil {
 		panic(e)
@@ -25,7 +25,7 @@ func init() {
 
 type localDealer struct{}
 
-func (localDealer) Deal(ctx context.Context, reqId int64, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
+func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	var (
 		opT       = time.Now()
 		logFormat = "%v %v%v > %v local %v %v %v"
