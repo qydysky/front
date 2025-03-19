@@ -146,7 +146,10 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 		logger.Info(`I:`, fmt.Sprintf("%v > %v", t.Addr, k))
 		t.routeMap.Store(k, route)
 
-		var logFormat = "%d %v %v%v %v %v"
+		var (
+			logFormat         = "%d %v %v%v %v %v"
+			logFormatWithBack = "%v %v %v%v > %v %v %v"
+		)
 
 		for _, routePath := range route.Path {
 			t.routeP.Store(routePath, func(w http.ResponseWriter, r *http.Request) {
@@ -293,7 +296,8 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						// some err can't retry
 						break
 					}
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqRetry))
+
+					logger.Warn(`W:`, fmt.Sprintf(logFormatWithBack, reqId, r.RemoteAddr, route.config.Addr, routePath, backP.Name, "ErrCanRetry", e))
 				}
 
 				if e != nil {
@@ -302,6 +306,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						w.WriteHeader(http.StatusForbidden)
 					} else if errors.Is(e, ErrAllBacksFail) {
 						w.WriteHeader(http.StatusBadGateway)
+						logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrAllBacksFail))
 					} else {
 						t.routeP.GetConn(r).Close()
 					}
