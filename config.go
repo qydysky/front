@@ -304,11 +304,13 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					w.Header().Add(header+"Error", e.Error())
 					if errors.Is(e, ErrHeaderCheckFail) || errors.Is(e, ErrBodyCheckFail) {
 						w.WriteHeader(http.StatusForbidden)
-					} else if errors.Is(e, ErrAllBacksFail) {
-						w.WriteHeader(http.StatusBadGateway)
-						logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrAllBacksFail))
 					} else {
-						t.routeP.GetConn(r).Close()
+						if errors.Is(e, ErrAllBacksFail) {
+							w.WriteHeader(http.StatusBadGateway)
+						} else {
+							t.routeP.GetConn(r).Close()
+						}
+						logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 					}
 				}
 			})
