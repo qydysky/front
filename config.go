@@ -193,7 +193,12 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					return
 				}
 
-				var backIs []*Back
+				var (
+					backIs    []*Back
+					backEqual = func(a, b *Back) bool {
+						return a == b
+					}
+				)
 
 				{
 					if t, e := r.Cookie("_psign_" + cookie); e == nil {
@@ -213,7 +218,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 								logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 							} else if ok {
 								for i := uint(0); i < backP.(*Back).Weight; i++ {
-									backIs = append(backIs, backP.(*Back))
+									backIs = addIfNotExsit(backIs, backEqual, backP.(*Back))
 								}
 							}
 						}
@@ -221,7 +226,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 					var splicingC = len(backIs)
 
-					backIs = append(backIs, route.FiliterBackByRequest(r)...)
+					backIs = addIfNotExsit(backIs, backEqual, route.FiliterBackByRequest(r)...)
 
 					if f, ok := rollRuleMap[route.RollRule]; ok {
 						f(backIs[splicingC:])
@@ -603,4 +608,16 @@ func LoadX509PubKey(certPEMBlock []byte) tls.Certificate {
 		}
 	}
 	return cert
+}
+
+func addIfNotExsit[T []E, E any](s T, equal func(a, b E) bool, e ...E) T {
+	for j := 0; j < len(e); j++ {
+		for i := 0; i < len(s); i++ {
+			if !equal(s[i], e[j]) {
+				s = append(s, e[j])
+				break
+			}
+		}
+	}
+	return s
 }
