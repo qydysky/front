@@ -23,7 +23,6 @@ import (
 	filiter "github.com/qydysky/front/filiter"
 	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
-	pfile "github.com/qydysky/part/file"
 	pslice "github.com/qydysky/part/slice"
 	pweb "github.com/qydysky/part/web"
 )
@@ -120,29 +119,9 @@ func (t *Config) startServer(ctx context.Context, logger Logger, conf *http.Serv
 	timer := time.NewTicker(time.Millisecond * 100)
 	defer timer.Stop()
 
-	var fd uintptr = 0
-	if t.FdPath != "" {
-		f := pfile.New(t.FdPath, 0, true)
-		if f.IsExist() {
-			if data, e := f.ReadAll(100, 100); errors.Is(e, io.EOF) {
-				if tmp, e := strconv.Atoi(string(data)); e == nil {
-					fd = uintptr(tmp)
-					logger.Info(`I:`, fmt.Sprintf("TakeOver. Fd:%v", fd))
-				}
-			}
-		}
-	}
-
 	for {
-		syncWeb, err := pweb.NewSyncMapNoPanic(conf, fd, &t.routeP, matchfunc)
+		syncWeb, err := pweb.NewSyncMapNoPanic(conf, &t.routeP, matchfunc)
 		if err == nil {
-			logger.Info(`I:`, fmt.Sprintf("Running. Fd:%v", syncWeb.FD))
-			f := pfile.New(t.FdPath, 0, true)
-			if f.IsExist() {
-				f.Delete()
-			}
-			f.Write([]byte(strconv.Itoa(int(syncWeb.FD))), false)
-			defer f.Delete()
 			shutdown = syncWeb.Shutdown
 			return
 		} else {
