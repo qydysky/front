@@ -612,10 +612,14 @@ func LoadX509PubKey(certPEMBlock []byte) tls.Certificate {
 
 func addIfNotExsit[T []E, E any](s T, equal func(a, b E) bool, e ...E) T {
 	for j := 0; j < len(e); j++ {
-		for i := 0; i < len(s); i++ {
-			if !equal(s[i], e[j]) {
-				s = append(s, e[j])
-				break
+		if len(s) == 0 {
+			s = append(s, e[j])
+		} else {
+			for i := 0; i < len(s); i++ {
+				if !equal(s[i], e[j]) {
+					s = append(s, e[j])
+					break
+				}
 			}
 		}
 	}
