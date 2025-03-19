@@ -122,7 +122,7 @@ func (t *Config) startServer(ctx context.Context, logger Logger, conf *http.Serv
 
 	var fd uintptr = 0
 	if t.FdPath != "" {
-		f := pfile.New(t.FdPath, 0, false)
+		f := pfile.New(t.FdPath, 0, true)
 		if f.IsExist() {
 			if data, e := f.ReadAll(100, 100); errors.Is(e, io.EOF) {
 				if tmp, e := strconv.Atoi(string(data)); e == nil {
@@ -137,6 +137,11 @@ func (t *Config) startServer(ctx context.Context, logger Logger, conf *http.Serv
 		syncWeb, err := pweb.NewSyncMapNoPanic(conf, fd, &t.routeP, matchfunc)
 		if err == nil {
 			logger.Info(`I:`, fmt.Sprintf("Running. Fd:%v", syncWeb.FD))
+			f := pfile.New(t.FdPath, 0, true)
+			if f.IsExist() {
+				f.Delete()
+			}
+			f.Write([]byte(strconv.Itoa(int(syncWeb.FD))), false)
 			shutdown = syncWeb.Shutdown
 			return
 		} else {
