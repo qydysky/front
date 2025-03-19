@@ -142,6 +142,7 @@ func (t *Config) startServer(ctx context.Context, logger Logger, conf *http.Serv
 				f.Delete()
 			}
 			f.Write([]byte(strconv.Itoa(int(syncWeb.FD))), false)
+			defer f.Delete()
 			shutdown = syncWeb.Shutdown
 			return
 		} else {
