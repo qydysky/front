@@ -75,6 +75,7 @@ config:
 - *addr*: string 监听端口 例：`0.0.0.0:8081`
 - *matchRule*: string 匹配规则，默认`prefix`。 `prefix`：当未匹配到时，返回最近的/匹配， `all`：当未匹配到时，返回404
 - reqIdLoop: uint 请求id环大小，用于日志识别请求，默认`1000`
+- fdPath: string fd路径，当不为空时，将会不间断的接管流量，默认`fd`
 - *copyBlocks*: int 转发的块数量，默认`1000`
 - *retryBlocks*: {} 重试, 当停用时，分配仅进行一次。当所有块都在使用中时，跳过。当请求没有`Content-Length`时，跳过。
     - *size*: string 重试的块大小，默认`1M`
