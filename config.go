@@ -218,9 +218,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 							if e, ok := filiter(backP.(*Back)); e != nil {
 								logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 							} else if ok {
-								for i := uint(0); i < backP.(*Back).Weight; i++ {
-									backIs = addIfNotExsit(backIs, backEqual, backP.(*Back))
-								}
+								backIs = addIfNotExsit(backIs, backEqual, backP.(*Back))
 							}
 						}
 					}
