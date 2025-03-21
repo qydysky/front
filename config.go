@@ -254,7 +254,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 				)
 				if t.RetryBlocksI != nil && r.Body != nil {
 					if contentLength := r.Header.Get("Content-Length"); contentLength != "" {
-						if len, e := strconv.Atoi(contentLength); e == nil && t.RetryBlocks.size >= len {
+						if len, e := strconv.Atoi(contentLength); e == nil {
 							var putBack func()
 							var e error
 							reqBuf, putBack, e = t.RetryBlocksI.Get()
