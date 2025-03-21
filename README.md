@@ -86,7 +86,7 @@ config:
     - path: []string 路径
     - pathAdd: bool 将客户端访问的路径附加在path上 例：/api/req => /ws => /ws/api/req
     - rollRule: string 可选
-        - `order`(按顺序)
+        - `order`(按顺序，每次都从第一个开始尝试)
         - `loop`(轮流)
         - `disableC_MinFirst`(禁用数较少的优先)
         - `dealingC_MinFirst`(连接数较少的优先)
