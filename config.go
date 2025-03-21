@@ -262,6 +262,9 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 								defer putBack()
 								reqBufUsed = true
 								n, _ := r.Body.Read(reqBuf)
+								if t.RetryBlocks.size == n {
+									logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyFull))
+								}
 								reqBuf = reqBuf[:n]
 							} else {
 								logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyOverflow))
@@ -280,7 +283,12 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					backP.lock.Unlock()
 
 					if reqBufUsed {
-						r.Body = io.NopCloser(bytes.NewBuffer(reqBuf))
+						if t.RetryBlocks.size == len(reqBuf) {
+							r.Body = io.NopCloser(io.MultiReader(bytes.NewBuffer(reqBuf), r.Body))
+							reqBufUsed = false
+						} else {
+							r.Body = io.NopCloser(bytes.NewBuffer(reqBuf))
+						}
 					}
 
 					if !strings.Contains(backP.To, "://") {
@@ -301,7 +309,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						break
 					}
 
-					if v, ok := e.(ErrCanRetry); !ok || !v.CanRetry {
+					if v, ok := e.(ErrCanRetry); !reqBufUsed || !ok || !v.CanRetry {
 						// some err can't retry
 						break
 					}
