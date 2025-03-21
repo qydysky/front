@@ -105,6 +105,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 	}
 
 	if resp == nil {
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
 		return MarkRetry(ErrResFail)
 	}
 
