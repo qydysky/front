@@ -249,8 +249,9 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 				// repack
 				var (
-					reqBuf     []byte
-					reqBufUsed bool
+					reqBuf        []byte
+					reqBufUsed    bool
+					reqBufAllRead bool
 				)
 				if t.RetryBlocksI != nil && r.Body != nil {
 					if contentLength := r.Header.Get("Content-Length"); contentLength != "" {
@@ -261,12 +262,26 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 							if e == nil {
 								defer putBack()
 								reqBufUsed = true
-								n, e := r.Body.Read(reqBuf)
-								fmt.Println(t.RetryBlocks.size, n, e)
-								if t.RetryBlocks.size == n {
+
+								offset := 0
+								for offset < cap(reqBuf) {
+									n, e := r.Body.Read(reqBuf[offset:])
+									offset += n
+									if e != nil {
+										if !errors.Is(e, io.EOF) {
+											logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+											w.Header().Add(header+"Error", ErrNoRoute.Error())
+											w.WriteHeader(http.StatusBadRequest)
+											return
+										}
+										reqBufAllRead = true
+										break
+									}
+								}
+								reqBuf = reqBuf[:offset]
+								if !reqBufAllRead {
 									logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyFull))
 								}
-								reqBuf = reqBuf[:n]
 							} else {
 								logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyOverflow))
 							}
@@ -284,7 +299,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					backP.lock.Unlock()
 
 					if reqBufUsed {
-						if t.RetryBlocks.size == len(reqBuf) {
+						if !reqBufAllRead {
 							r.Body = io.NopCloser(io.MultiReader(bytes.NewBuffer(reqBuf), r.Body))
 							reqBufUsed = false
 						} else {
