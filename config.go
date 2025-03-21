@@ -298,6 +298,11 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						break
 					}
 
+					if errors.Is(e, context.Canceled) {
+						e = nil
+						break
+					}
+
 					if v, ok := e.(ErrCanRetry); !ok || !v.CanRetry {
 						// some err can't retry
 						break
