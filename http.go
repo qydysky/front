@@ -13,6 +13,7 @@ import (
 
 	"github.com/qydysky/front/utils"
 	component2 "github.com/qydysky/part/component2"
+	pctx "github.com/qydysky/part/ctx"
 	pslice "github.com/qydysky/part/slice"
 )
 
@@ -102,6 +103,11 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 	if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", ErrResTO, time.Since(opT)))
 		chosenBack.Disable()
+	}
+
+	if pctx.Done(r.Context()) {
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", context.Canceled, time.Since(opT)))
+		return context.Canceled
 	}
 
 	if resp == nil {

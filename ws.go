@@ -82,12 +82,13 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 	}
 	// }
 
-	if conn == nil || resp == nil {
-		return MarkRetry(ErrResFail)
+	if pctx.Done(r.Context()) {
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, context.Canceled, time.Since(opT)))
+		return context.Canceled
 	}
 
-	if pctx.Done(r.Context()) {
-		return context.Canceled
+	if conn == nil || resp == nil {
+		return MarkRetry(ErrResFail)
 	}
 
 	if ok, e := chosenBack.getFiliterResHeader().Match(resp.Header); e != nil {
