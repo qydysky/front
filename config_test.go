@@ -1,7 +1,9 @@
 package front
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -9,6 +11,7 @@ import (
 	"github.com/qydysky/front/filiter"
 	plog "github.com/qydysky/part/log"
 	reqf "github.com/qydysky/part/reqf"
+	pweb "github.com/qydysky/part/web"
 )
 
 var logger = plog.New(plog.Config{
@@ -132,5 +135,63 @@ func Test_Back(t *testing.T) {
 		}
 	} else {
 		t.Fail()
+	}
+}
+
+func Test_Res(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	}).Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/`: func(w http.ResponseWriter, r *http.Request) {
+			io.Copy(w, r.Body)
+		},
+	})
+
+	conf := &Config{
+		RetryBlocks: RetryBlocks{
+			Num:  10,
+			Size: "3B",
+		},
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path:    []string{"/"},
+				PathAdd: true,
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+					},
+				},
+			},
+		},
+	}
+
+	go conf.Run(ctx, logger)
+
+	time.Sleep(time.Second)
+
+	reqb := []byte("1234")
+	resb := make([]byte, 5)
+
+	pipe := reqf.NewRawReqRes()
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url:     "http://127.0.0.1:19000/",
+		RawPipe: pipe,
+		Async:   true,
+	}); e != nil {
+		t.Fatal()
+	}
+	pipe.ReqWrite(reqb)
+	pipe.ReqClose()
+	n, _ := pipe.ResRead(resb)
+	resb = resb[:n]
+	if !bytes.Equal(resb, reqb) {
+		t.Fatal(resb)
 	}
 }

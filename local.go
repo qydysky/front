@@ -28,7 +28,7 @@ type localDealer struct{}
 func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	var (
 		opT       = time.Now()
-		logFormat = "%v %v%v > %v local %v %v %v"
+		logFormat = "%v %v %v%v > %v local %v %v %v"
 	)
 
 	path := chosenBack.To

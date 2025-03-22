@@ -23,6 +23,7 @@ import (
 	filiter "github.com/qydysky/front/filiter"
 	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
+	pio "github.com/qydysky/part/io"
 	pslice "github.com/qydysky/part/slice"
 	pweb "github.com/qydysky/part/web"
 )
@@ -34,11 +35,7 @@ type Config struct {
 		Pub string `json:"pub"`
 		Key string `json:"key"`
 	} `json:"tls"`
-	RetryBlocks struct {
-		Size string `json:"size"`
-		size int    `json:"-"`
-		Num  int    `json:"num"`
-	} `json:"retryBlocks"`
+	RetryBlocks  RetryBlocks          `json:"retryBlocks"`
 	RetryBlocksI pslice.BlocksI[byte] `json:"-"`
 	MatchRule    string               `json:"matchRule"`
 	FdPath       string               `json:"fdPath"`
@@ -51,6 +48,12 @@ type Config struct {
 
 	ReqIdLoop int           `json:"reqIdLoop"`
 	reqId     atomic.Uint32 `json:"-"`
+}
+
+type RetryBlocks struct {
+	Size string `json:"size"`
+	size int    `json:"-"`
+	Num  int    `json:"num"`
 }
 
 func (t *Config) Run(ctx context.Context, logger Logger) {
@@ -85,10 +88,10 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 		}
 		t.BlocksI = pslice.NewBlocks[byte](16*1024, t.CopyBlocks)
 	}
-	if size, err := humanize.ParseBytes(t.RetryBlocks.Size); err != nil || size < humanize.MByte {
-		t.RetryBlocks.size = humanize.MByte
-	} else {
+	if size, err := humanize.ParseBytes(t.RetryBlocks.Size); err == nil && size > 0 {
 		t.RetryBlocks.size = int(size)
+	} else {
+		t.RetryBlocks.size = humanize.MByte
 	}
 	if t.RetryBlocks.size > 0 && t.RetryBlocks.Num > 0 {
 		t.RetryBlocksI = pslice.NewBlocks[byte](t.RetryBlocks.size, t.RetryBlocks.Num)
@@ -249,13 +252,14 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 				// repack
 				var (
-					reqBuf        []byte
-					reqBufUsed    bool
-					reqBufAllRead bool
+					reqBuf     []byte
+					reqBufUsed bool
+					reqAllRead bool
+					delayBody  io.ReadCloser
 				)
 				if t.RetryBlocksI != nil && r.Body != nil {
 					if contentLength := r.Header.Get("Content-Length"); contentLength != "" {
-						if _, e := strconv.Atoi(contentLength); e == nil {
+						if n, e := strconv.Atoi(contentLength); e == nil && n < t.RetryBlocks.size {
 							var putBack func()
 							var e error
 							reqBuf, putBack, e = t.RetryBlocksI.Get()
@@ -274,12 +278,15 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 											w.WriteHeader(http.StatusBadRequest)
 											return
 										}
-										reqBufAllRead = true
+										reqAllRead = true
+										break
+									} else if n == 0 {
 										break
 									}
 								}
 								reqBuf = reqBuf[:offset]
-								if !reqBufAllRead {
+								if !reqAllRead {
+									delayBody = r.Body
 									logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", ErrReqReBodyFull))
 								}
 							} else {
@@ -299,8 +306,11 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					backP.lock.Unlock()
 
 					if reqBufUsed {
-						if !reqBufAllRead {
-							r.Body = io.NopCloser(io.MultiReader(bytes.NewBuffer(reqBuf), r.Body))
+						if !reqAllRead {
+							r.Body = pio.RWC{
+								R: io.MultiReader(bytes.NewBuffer(reqBuf), delayBody).Read,
+								C: delayBody.Close,
+							}
 							reqBufUsed = false
 						} else {
 							r.Body = io.NopCloser(bytes.NewBuffer(reqBuf))
