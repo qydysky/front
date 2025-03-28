@@ -5,7 +5,7 @@ go 1.24
 require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/gorilla/websocket v1.5.3
-	github.com/qydysky/part v0.28.20250328130819
+	github.com/qydysky/part v0.28.20250328181619
 	golang.org/x/net v0.37.0
 )
 
