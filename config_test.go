@@ -252,3 +252,62 @@ func Test_Res(t *testing.T) {
 		t.Fatal(resb)
 	}
 }
+
+func Test_Cookie(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	c1 := "login_locale=zh_CN; Max-Age=31536000; Expires=Wed, 15 Apr 2026 02:29:42; Path=/"
+	c2 := "login_locale=zh_CN; Max-Age=31536000; Expires=Wed, 15 Apr 2026 02:29:43; Path=/"
+	c3 := "ts=11111111111"
+
+	pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	}).Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/`: func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("Set-Cookie", c1)
+			w.Header().Add("Set-Cookie", c2)
+			w.Header().Add("Set-Cookie", c3)
+			io.Copy(w, r.Body)
+		},
+	})
+
+	conf := &Config{
+		RetryBlocks: RetryBlocks{
+			Num:  10,
+			Size: "3B",
+		},
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path:    []string{"/"},
+				PathAdd: true,
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+					},
+				},
+			},
+		},
+	}
+
+	go conf.Run(ctx, logger)
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/",
+	}); e != nil {
+		t.Fatal()
+	}
+
+	if v, ok := map[string][]string(r.Response.Header)["Set-Cookie"]; !ok {
+		t.Fail()
+	} else if v[0] != c1 || v[1] != c2 || v[2] != c3 {
+		t.Fail()
+	}
+	// t.Log(r.Response.Header)
+}

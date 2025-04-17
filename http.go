@@ -140,10 +140,10 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		if utils.ValidCookieDomain(r.Host) {
 			cookie.Domain = r.Host
 		}
-		w.Header().Set("Set-Cookie", (cookie).String())
+		w.Header().Add("Set-Cookie", (cookie).String())
 	}
 
-	w.Header().Set(header+"Info", cookie+";"+chosenBack.Name)
+	w.Header().Add(header+"Info", cookie+";"+chosenBack.Name)
 
 	// if e :=
 	copyHeader(resp.Header, w.Header(), chosenBack.getDealerResHeader())

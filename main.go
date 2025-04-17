@@ -13,6 +13,8 @@ import (
 	"time"
 	_ "unsafe"
 
+	"slices"
+
 	"github.com/qydysky/front/dealer"
 	utils "github.com/qydysky/front/utils"
 	pctx "github.com/qydysky/part/ctx"
@@ -147,18 +149,20 @@ func copyHeader(s, t http.Header, app []dealer.HeaderDealer) {
 			continue
 		}
 		if strings.ToLower(k) == "set-cookie" {
-			cookies := strings.Split(v[0], ";")
-			for k, v := range cookies {
-				if strings.Contains(strings.ToLower(v), "domain=") {
-					cookies = append(cookies[:k], cookies[k+1:]...)
-					break
+			for _, cookie := range v {
+				cookieSlice := strings.Split(cookie, ";")
+				for cookieK, cookieV := range cookieSlice {
+					if strings.Contains(strings.ToLower(cookieV), "domain=") {
+						cookieSlice = slices.Delete(cookieSlice, cookieK, cookieK+1)
+					}
 				}
+				tm[k] = append(tm[k], strings.Join(cookieSlice, ";"))
 			}
-			tm[k] = []string{strings.Join(cookies, ";")}
 		} else {
-			tm[k] = v
+			tm[k] = append(tm[k], v...)
 		}
 	}
+
 	for _, v := range app {
 		switch v.Action {
 		case `replace`:
