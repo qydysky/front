@@ -311,3 +311,55 @@ func Test_Cookie(t *testing.T) {
 	}
 	// t.Log(r.Response.Header)
 }
+
+func Test_Retry(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pweb.New(&http.Server{
+		Addr: "127.0.0.1:19002",
+	}).Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/`: func(w http.ResponseWriter, r *http.Request) {
+			io.Copy(w, r.Body)
+		},
+	})
+
+	conf := &Config{
+		RetryBlocks: RetryBlocks{
+			Num:  10,
+			Size: "3B",
+		},
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path:     []string{"/"},
+				PathAdd:  true,
+				RollRule: "order",
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+					},
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19002",
+						Weight: 1,
+					},
+				},
+			},
+		},
+	}
+
+	go conf.Run(ctx, logger)
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/",
+		// PostStr: "1",
+	}); e != nil {
+		t.Fatal()
+	}
+}

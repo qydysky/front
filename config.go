@@ -252,14 +252,15 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 
 				// repack
 				var (
-					reqBuf     []byte
-					reqBufUsed bool
-					reqAllRead bool
-					delayBody  io.ReadCloser
+					reqBuf           []byte
+					reqBufUsed       bool
+					reqAllRead       bool
+					reqContentLength string = r.Header.Get("Content-Length")
+					delayBody        io.ReadCloser
 				)
 				if t.RetryBlocksI != nil && r.Body != nil {
-					if contentLength := r.Header.Get("Content-Length"); contentLength != "" {
-						if n, e := strconv.Atoi(contentLength); e == nil && n < t.RetryBlocks.size {
+					if reqContentLength != "" {
+						if n, e := strconv.Atoi(reqContentLength); e == nil && n < t.RetryBlocks.size {
 							var putBack func()
 							var e error
 							reqBuf, putBack, e = t.RetryBlocksI.Get()
@@ -335,8 +336,11 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						break
 					}
 
-					if v, ok := e.(ErrCanRetry); !reqBufUsed || !ok || !v.CanRetry {
+					if v, ok := e.(ErrCanRetry); !ok || !v.CanRetry {
 						// some err can't retry
+						break
+					} else if reqContentLength != "" && !reqBufUsed {
+						// has body but buf no allow reuse
 						break
 					}
 

@@ -76,7 +76,7 @@ config:
 - *matchRule*: string 匹配规则，默认`prefix`。 `prefix`：当未匹配到时，返回最近的/匹配， `all`：当未匹配到时，返回404
 - reqIdLoop: uint 请求id环大小，用于日志识别请求，默认`1000`
 - *copyBlocks*: int 转发的块数量，默认`1000`
-- *retryBlocks*: {} 重试, 当停用时，分配仅进行一次。当所有块都在使用中时，跳过。当请求没有`Content-Length`时，跳过。
+- *retryBlocks*: {} 重试, 当停用时，不进行重试。其他情况：1.当所有块都在使用中时，不进行重试。2.当请求没有`Content-Length`时，将会重试。
     - *size*: string 重试的块大小，默认`1M`
     - *num*: int 重试的块数量，默认`0`，为`0`时停用重试
 - *tls*: {} 启用tls, 默认空
