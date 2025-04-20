@@ -506,6 +506,9 @@ func (t *Back) SwapSign(logger Logger) {
 	} else {
 		t.verifyPeerCer, t.verifyPeerCerErr = os.ReadFile(path)
 	}
+	if t.Proxy == "" {
+		t.Proxy = t.route.Proxy
+	}
 	if t.lastChosenT.IsZero() {
 		t.lastChosenT = time.Now()
 	}
@@ -627,6 +630,7 @@ type Setting struct {
 	ErrBanSec          int             `json:"errBanSec"`
 	InsecureSkipVerify bool            `json:"insecureSkipVerify"`
 	VerifyPeerCer      string          `json:"verifyPeerCer"`
+	Proxy              string          `json:"proxy"`
 	Filiter            filiter.Filiter `json:"filiter"`
 	Dealer             dealer.Dealer   `json:"dealer"`
 	verifyPeerCer      []byte

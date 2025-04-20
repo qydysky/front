@@ -109,6 +109,7 @@ setting: setting代指下述各配置
 - errBanSec: int 当后端错误时（指连接失败，不指后端错误响应），将会禁用若干秒
 - insecureSkipVerify: bool 忽略不安全的tls证书
 - verifyPeerCer: string 路径，校验服务器证书，使用intermediate_ca
+- proxy: string 使用proxy进行请求，支持`socks5:\\`，`http:\\`，`https:\\`
 
 - filiter:
     - reqUri: 请求后端前，请求路径过滤器

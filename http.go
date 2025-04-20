@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	netUrl "net/url"
 	"time"
 	_ "unsafe"
 
@@ -62,6 +63,12 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	customTransport.TLSClientConfig = &tls.Config{
 		InsecureSkipVerify: chosenBack.getInsecureSkipVerify(),
+	}
+
+	if chosenBack.Proxy != "" {
+		customTransport.Proxy = func(_ *http.Request) (*netUrl.URL, error) {
+			return netUrl.Parse(chosenBack.Proxy)
+		}
 	}
 
 	if cer, err := chosenBack.getVerifyPeerCer(); err == nil {
@@ -154,7 +161,9 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	w.WriteHeader(resp.StatusCode)
 
-	if resp.StatusCode < 200 || resp.StatusCode == 204 || resp.StatusCode == 304 {
+	if resp.StatusCode < 200 ||
+		resp.StatusCode == http.StatusNoContent ||
+		(resp.StatusCode < 400 && resp.StatusCode >= 300) {
 		return nil
 	}
 
