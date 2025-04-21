@@ -75,7 +75,9 @@ config:
 - *addr*: string 监听端口 例：`0.0.0.0:8081`
 - *matchRule*: string 匹配规则，默认`prefix`。 `prefix`：当未匹配到时，返回最近的/匹配， `all`：当未匹配到时，返回404
 - reqIdLoop: uint 请求id环大小，用于日志识别请求，默认`1000`
-- *copyBlocks*: int 转发的块数量，默认`1000`
+- *copyBlocks*:{} 转发的块
+    - *size*: string 转发的块大小，默认`16K`
+    - *num*: int 转发的块数量，默认`1000`
 - *retryBlocks*: {} 重试, 当停用时，不进行重试。其他情况：1.当所有块都在使用中时，不进行重试。2.当请求没有`Content-Length`时，将会重试。
     - *size*: string 重试的块大小，默认`1M`
     - *num*: int 重试的块数量，默认`0`，为`0`时停用重试
@@ -109,31 +111,31 @@ setting: setting代指下述各配置
 - errBanSec: int 当后端错误时（指连接失败，不指后端错误响应），将会禁用若干秒
 - insecureSkipVerify: bool 忽略不安全的tls证书
 - verifyPeerCer: string 路径，校验服务器证书，使用intermediate_ca
-- proxy: string 使用proxy进行请求，支持`socks5:\\`，`http:\\`，`https:\\`
+- proxy: string 使用proxy进行请求，支持`socks5:\\`，`http:\\`，`https:\\`(仅http、https、ws、wss有效)
 
-- filiter:
-    - reqUri: 请求后端前，请求路径过滤器
-        - accessRule: 布尔表达式，为true时才通过,例`{id}|(!{id2}&{id3})`
+- filiter: {}
+    - reqUri:{} 请求后端前，请求路径过滤器
+        - accessRule:string 布尔表达式，为true时才通过,例`{id}|(!{id2}&{id3})`
         - items: map[string]string
             - id: matchExp
-    - reqHeader: 请求后端前，请求头处理器
-        - accessRule: 布尔表达式，为true时才通过
+    - reqHeader:{} 请求后端前，请求头处理器
+        - accessRule:string 布尔表达式，为true时才通过
         - items: map[string]{}
             - id:
                 - key: string header头
                 - matchExp: string
-    - resHeader: 返回后端的响应前，请求头处理器
-        - accessRule: 布尔表达式，为true时才通过
+    - resHeader:{} 返回后端的响应前，请求头处理器
+        - accessRule:string 布尔表达式，为true时才通过
         - items: map[string]{}
             - id:
                 - key: string header头
                 - matchExp: string
-    - reqBody: 请求后端前，请求数据过滤器(仅route层有效)
+    - reqBody:{} 请求后端前，请求数据过滤器(仅route层有效)
         - action: string 可选`access`、`deny`
         - reqSize: string 限定请求数据大小，默认为`1M`
         - matchExp: string `access`时如不匹配将结束请求。`deny`时如匹配将结束请求
 
-- dealer:
+- dealer: {}
     - reqUri:[] 请求后端前，路径处理器
         - action: string 可选`replace`。
         - matchExp: string `replace`时结合value进行替换
@@ -148,4 +150,8 @@ setting: setting代指下述各配置
         - key: string 具体处理哪个头
         - matchExp: string `replace`时结合value进行替换
         - value: string `replace`时结合matchExp进行替换。`add`时将附加值。`set`时将覆盖值。
+    - resBody:[] 返回后端响应前，数据处理器(仅http、https有效),使用转发块进行处理
+        - action: string 可选`replace`。
+        - matchExp: string `replace`时结合value进行替换
+        - value: string `replace`时结合matchExp进行替换。
 

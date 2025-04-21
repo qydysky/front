@@ -145,14 +145,14 @@ func copyHeader(s, t http.Header, app []dealer.HeaderDealer) {
 	sm := (map[string][]string)(s)
 	tm := (map[string][]string)(t)
 	for k, v := range sm {
-		if strings.ToLower(k) == "origin" {
+		if strings.ToLower(k) == "origin" || strings.ToLower(k) == "content-length" {
 			continue
 		}
 		if strings.ToLower(k) == "set-cookie" {
 			for _, cookie := range v {
 				cookieSlice := strings.Split(cookie, ";")
 				for cookieK, cookieV := range cookieSlice {
-					if strings.Contains(strings.ToLower(cookieV), "domain=") {
+					if strings.HasPrefix(strings.TrimSpace(strings.ToLower(cookieV)), "domain=") {
 						cookieSlice = slices.Delete(cookieSlice, cookieK, cookieK+1)
 					}
 				}

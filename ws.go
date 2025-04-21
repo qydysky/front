@@ -278,8 +278,8 @@ func DialContext(ctx context.Context, urlStr string, requestHeader http.Header, 
 	}
 
 	// If needed, wrap the dial function to connect through a proxy.
-	if chosenBack.Proxy != "" {
-		proxyURL, err := url.Parse(chosenBack.Proxy)
+	if chosenBack.getProxy() != "" {
+		proxyURL, err := url.Parse(chosenBack.getProxy())
 		if err != nil {
 			return nil, nil, err
 		}

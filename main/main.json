@@ -2,13 +2,12 @@
   {
     "addr": "127.0.0.1:0",
     "matchRule": "prefix",
-    "copyBlocks": 1000,
     "tls": {
       "pub": "",
       "key": ""
     },
     "retryBlocks": {
-      "sizeB": 10,
+      "size": 10,
       "num": 10
     },
     "routes": [

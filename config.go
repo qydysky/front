@@ -35,11 +35,11 @@ type Config struct {
 		Pub string `json:"pub"`
 		Key string `json:"key"`
 	} `json:"tls"`
-	RetryBlocks  RetryBlocks          `json:"retryBlocks"`
+	RetryBlocks  Blocks               `json:"retryBlocks"`
 	RetryBlocksI pslice.BlocksI[byte] `json:"-"`
 	MatchRule    string               `json:"matchRule"`
 	FdPath       string               `json:"fdPath"`
-	CopyBlocks   int                  `json:"copyBlocks"`
+	CopyBlocks   Blocks               `json:"copyBlocks"`
 	BlocksI      pslice.BlocksI[byte] `json:"-"`
 
 	routeP   pweb.WebPath
@@ -50,7 +50,7 @@ type Config struct {
 	reqId     atomic.Uint32 `json:"-"`
 }
 
-type RetryBlocks struct {
+type Blocks struct {
 	Size string `json:"size"`
 	size int    `json:"-"`
 	Num  int    `json:"num"`
@@ -83,10 +83,15 @@ func (t *Config) Run(ctx context.Context, logger Logger) {
 	}
 
 	if t.BlocksI == nil {
-		if t.CopyBlocks == 0 {
-			t.CopyBlocks = 1000
+		if t.CopyBlocks.Num == 0 {
+			t.CopyBlocks.Num = 1000
 		}
-		t.BlocksI = pslice.NewBlocks[byte](16*1024, t.CopyBlocks)
+		if size, err := humanize.ParseBytes(t.CopyBlocks.Size); err == nil && size > 0 {
+			t.CopyBlocks.size = int(size)
+		} else {
+			t.CopyBlocks.size = humanize.KByte * 16
+		}
+		t.BlocksI = pslice.NewBlocks[byte](t.CopyBlocks.size, t.CopyBlocks.Num)
 	}
 	if size, err := humanize.ParseBytes(t.RetryBlocks.Size); err == nil && size > 0 {
 		t.RetryBlocks.size = int(size)
@@ -506,15 +511,18 @@ func (t *Back) SwapSign(logger Logger) {
 	} else {
 		t.verifyPeerCer, t.verifyPeerCerErr = os.ReadFile(path)
 	}
-	if t.Proxy == "" {
-		t.Proxy = t.route.Proxy
-	}
 	if t.lastChosenT.IsZero() {
 		t.lastChosenT = time.Now()
 	}
 	t.AlwaysUp = len(t.route.Backs) == 1 || t.AlwaysUp
 }
 
+func (t *Back) getProxy() string {
+	if t.Proxy == "" {
+		return t.route.Proxy
+	}
+	return t.Proxy
+}
 func (t *Back) getSplicing() int {
 	if t.Splicing == 0 {
 		return t.route.Splicing
@@ -581,6 +589,9 @@ func (t *Back) getDealerReqHeader() []dealer.HeaderDealer {
 }
 func (t *Back) getDealerResHeader() []dealer.HeaderDealer {
 	return append(t.route.Dealer.ResHeader, t.Dealer.ResHeader...)
+}
+func (t *Back) getDealerResBody() []dealer.Body {
+	return append(t.route.Dealer.ResBody, t.Dealer.ResBody...)
 }
 
 func (t *Back) Id() string {

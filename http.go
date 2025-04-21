@@ -9,12 +9,18 @@ import (
 	"io"
 	"net/http"
 	netUrl "net/url"
+	"strings"
 	"time"
 	_ "unsafe"
 
+	"compress/flate"
+	gzip "compress/gzip"
+
+	br "github.com/qydysky/brotli"
 	"github.com/qydysky/front/utils"
 	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
+	pio "github.com/qydysky/part/io"
 	pslice "github.com/qydysky/part/slice"
 )
 
@@ -65,9 +71,9 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		InsecureSkipVerify: chosenBack.getInsecureSkipVerify(),
 	}
 
-	if chosenBack.Proxy != "" {
+	if chosenBack.getProxy() != "" {
 		customTransport.Proxy = func(_ *http.Request) (*netUrl.URL, error) {
-			return netUrl.Parse(chosenBack.Proxy)
+			return netUrl.Parse(chosenBack.getProxy())
 		}
 	}
 
@@ -174,7 +180,83 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		return ErrCopy
 	} else {
 		defer put()
-		if _, e = io.CopyBuffer(w, resp.Body, tmpbuf); e != nil {
+
+		var dealers []func(data []byte) (dealed []byte, stop bool)
+		for _, v := range chosenBack.getDealerResBody() {
+			switch v.Action {
+			case `replace`:
+				dealers = append(dealers, v.GetReplaceDealer())
+			default:
+			}
+		}
+		if len(dealers) > 0 {
+			var reader io.Reader
+			var writer io.Writer
+			var dealBody bool
+			switch strings.ToLower(resp.Header.Get("Content-Encoding")) {
+			case `br`:
+				reader = br.NewReader(resp.Body)
+				w1 := br.NewWriter(w)
+				writer = pio.RWC{
+					W: func(p []byte) (n int, err error) {
+						n, err = w1.Write(p)
+						w1.Flush()
+						return
+					},
+				}
+				dealBody = true
+			case `gzip`:
+				if tmp, e := gzip.NewReader(resp.Body); e != nil {
+					logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+					return ErrCopy
+				} else {
+					reader = tmp
+					w1 := gzip.NewWriter(w)
+					writer = pio.RWC{
+						W: func(p []byte) (n int, err error) {
+							n, err = w1.Write(p)
+							w1.Flush()
+							return
+						},
+					}
+				}
+				dealBody = true
+			case `deflate`:
+				if tmp, e := flate.NewWriter(w, 1); e != nil {
+					logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+					return ErrCopy
+				} else {
+					reader = flate.NewReader(resp.Body)
+					writer = pio.RWC{
+						W: func(p []byte) (n int, err error) {
+							n, err = tmp.Write(p)
+							tmp.Flush()
+							return
+						},
+					}
+				}
+				dealBody = true
+			case ``:
+				reader = resp.Body
+				writer = w
+				dealBody = true
+			default:
+				reader = resp.Body
+				writer = w
+			}
+			if dealBody {
+				if e := pio.CopyDealer(writer, reader, tmpbuf, dealers...); e != nil {
+					logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+					return ErrCopy
+				}
+			} else if _, e = io.CopyBuffer(w, resp.Body, tmpbuf); e != nil {
+				logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+				if !errors.Is(e, context.Canceled) {
+					chosenBack.Disable()
+				}
+				return ErrCopy
+			}
+		} else if _, e = io.CopyBuffer(w, resp.Body, tmpbuf); e != nil {
 			logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
 			if !errors.Is(e, context.Canceled) {
 				chosenBack.Disable()

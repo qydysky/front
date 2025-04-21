@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/qydysky/front/dealer"
 	"github.com/qydysky/front/filiter"
 	plog "github.com/qydysky/part/log"
 	reqf "github.com/qydysky/part/reqf"
@@ -208,7 +209,7 @@ func Test_Res(t *testing.T) {
 	})
 
 	conf := &Config{
-		RetryBlocks: RetryBlocks{
+		RetryBlocks: Blocks{
 			Num:  10,
 			Size: "3B",
 		},
@@ -273,7 +274,7 @@ func Test_Cookie(t *testing.T) {
 	})
 
 	conf := &Config{
-		RetryBlocks: RetryBlocks{
+		RetryBlocks: Blocks{
 			Num:  10,
 			Size: "3B",
 		},
@@ -325,7 +326,7 @@ func Test_Retry(t *testing.T) {
 	})
 
 	conf := &Config{
-		RetryBlocks: RetryBlocks{
+		RetryBlocks: Blocks{
 			Num:  10,
 			Size: "3B",
 		},
@@ -361,5 +362,66 @@ func Test_Retry(t *testing.T) {
 		// PostStr: "1",
 	}); e != nil {
 		t.Fatal()
+	}
+}
+
+func Test_ResBody(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	}).Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/`: func(w http.ResponseWriter, r *http.Request) {
+			io.Copy(w, r.Body)
+		},
+	})
+
+	conf := &Config{
+		RetryBlocks: Blocks{
+			Num:  10,
+			Size: "10B",
+		},
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path:     []string{"/"},
+				PathAdd:  true,
+				RollRule: "order",
+				Setting: Setting{
+					Dealer: dealer.Dealer{
+						ResBody: []dealer.Body{
+							{
+								Action:   "replace",
+								MatchExp: "23",
+								Value:    "ab",
+							},
+						},
+					},
+				},
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+					},
+				},
+			},
+		},
+	}
+
+	go conf.Run(ctx, logger)
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url:     "http://127.0.0.1:19000/",
+		PostStr: "12345",
+	}); e != nil {
+		t.Fatal()
+	}
+	if !bytes.Equal(r.Respon, []byte("1ab45")) {
+		t.Fatal(r.Respon)
 	}
 }
