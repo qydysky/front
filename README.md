@@ -14,6 +14,29 @@
 - 请求数据过滤
 
 支持嵌入到其他项目中/独立运行
+```
+Usage of main:
+  -adminPath string
+        adminPath, eg:/123/12/
+  -adminPort int
+        adminPort, eg:10908
+  -c string
+        config (default "main.json")
+  -logFile string
+        logFile, defalut no log file
+  -noAutoReload
+        noAutoReload
+  -noDebugLog
+        noDebugLog
+  -noLog
+        noLog
+  -reload
+        reload, when adminPort/adminPath set
+  -restart
+        restart, when adminPort/adminPath set
+  -stop
+        stop, when adminPort/adminPath set
+```
 
 示例
 ```json

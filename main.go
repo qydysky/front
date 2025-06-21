@@ -2,7 +2,6 @@ package front
 
 import (
 	"context"
-	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,9 +14,11 @@ import (
 
 	"slices"
 
+	"github.com/dustin/go-humanize"
 	"github.com/qydysky/front/dealer"
 	utils "github.com/qydysky/front/utils"
 	pctx "github.com/qydysky/part/ctx"
+	pfile "github.com/qydysky/part/file"
 	pweb "github.com/qydysky/part/web"
 )
 
@@ -33,17 +34,10 @@ type File interface {
 }
 
 // 加载
-func LoadPeriod(ctx context.Context, buf []byte, configF File, configS *[]Config, logger Logger) error {
-	var oldBufMd5 string
-
-	if bufMd5, e := loadConfig(ctx, buf, configF, configS, logger); e != nil {
-		logger.Error(`E:`, "配置加载", e)
+func LoadPeriod(ctx context.Context, configF *pfile.File, configS *[]Config, logger Logger) error {
+	if e := Load(ctx, configF, configS, logger); e != nil {
 		return e
-	} else {
-		oldBufMd5 = bufMd5
 	}
-
-	logger.Info(`I:`, "配置更新", oldBufMd5[:5])
 
 	// 定时加载config
 	go func() {
@@ -52,17 +46,21 @@ func LoadPeriod(ctx context.Context, buf []byte, configF File, configS *[]Config
 		for {
 			select {
 			case <-time.After(time.Second * 5):
-				if bufMd5, e := loadConfig(ctx, buf, configF, configS, logger); e != nil {
-					logger.Error(`E:`, "配置加载", e)
-				} else if bufMd5 != oldBufMd5 {
-					oldBufMd5 = bufMd5
-					logger.Info(`I:`, "配置更新", oldBufMd5[:5])
-				}
+				_ = Load(ctx, configF, configS, logger)
 			case <-ctx1.Done():
 				return
 			}
 		}
 	}()
+	return nil
+}
+
+// 加载
+func Load(ctx context.Context, configF *pfile.File, configS *[]Config, logger Logger) error {
+	var buf, _ = configF.ReadAll(humanize.KByte, humanize.MByte)
+	if e := loadConfig(ctx, buf, configS, logger); e != nil {
+		return e
+	}
 	return nil
 }
 
@@ -99,34 +97,26 @@ func Test(ctx context.Context, port int, logger Logger) {
 	<-ctx1.Done()
 }
 
-func loadConfig(ctx context.Context, buf []byte, configF File, configS *[]Config, logger Logger) (md5k string, e error) {
+func loadConfig(ctx context.Context, buf []byte, configS *[]Config, logger Logger) (e error) {
 	// defer func() {
 	// 	if err := recover(); err != nil {
 	// 		logger.Error(`E:`, err)
 	// 		e = errors.New("read panic")
 	// 	}
 	// }()
-	if i, e := configF.Read(buf); e != nil && !errors.Is(e, io.EOF) {
-		return "", e
-	} else if i == cap(buf) {
-		return "", errors.New(`buf full`)
-	} else if !json.Valid(buf[:i]) {
-		return "", errors.New(`json inValid`)
+	if !json.Valid(buf) {
+		return errors.New(`json inValid`)
 	} else {
-		w := md5.New()
-		w.Write(buf[:i])
-		md5k = fmt.Sprintf("%x", w.Sum(nil))
-
-		if e := json.Unmarshal(buf[:i], configS); e != nil {
-			return md5k, e
+		if e := json.Unmarshal(buf, configS); e != nil {
+			return e
 		}
-		for i := 0; i < len(*configS); i++ {
+		for i := 0; e == nil && i < len(*configS); i++ {
 			(*configS)[i].lock.Lock()
 			(*configS)[i].SwapSign(ctx, logger)
 			(*configS)[i].lock.Unlock()
 		}
 	}
-	return md5k, nil
+	return
 }
 
 func dealUri(s string, app []dealer.UriDealer) (t string) {
