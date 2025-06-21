@@ -76,7 +76,7 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, runf func()) 
 			errPub error
 			errPri error
 		)
-		if !strings.HasPrefix(t.TLS.Pub, "http") {
+		if !strings.HasPrefix(t.TLS.Pub, "http://") && !strings.HasPrefix(t.TLS.Pub, "https://") {
 			pf := pfile.New(t.TLS.Pub, 0, false)
 			pub, errPub = pf.ReadAll(humanize.KByte, humanize.MByte)
 		} else {
@@ -86,7 +86,7 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, runf func()) 
 			})
 			pub = r.Respon
 		}
-		if !strings.HasPrefix(t.TLS.Key, "http") {
+		if !strings.HasPrefix(t.TLS.Key, "http://") && !strings.HasPrefix(t.TLS.Pub, "https://") {
 			pf := pfile.New(t.TLS.Pub, 0, false)
 			pri, errPri = pf.ReadAll(humanize.KByte, humanize.MByte)
 		} else {

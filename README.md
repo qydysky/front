@@ -105,8 +105,8 @@ config:
     - *size*: string 重试的块大小，默认`1M`
     - *num*: int 重试的块数量，默认`0`，为`0`时停用重试
 - *tls*: {} 启用tls, 默认空
-    - *pub*: string 公钥pem路径
-    - *key*: string 私钥pem路径
+    - *pub*: string 公钥pem路径，支持从`http`/`https`获取
+    - *key*: string 私钥pem路径，支持从`http`/`https`获取
 - routes: [] 路由
     - path: []string 路径
     - pathAdd: bool 将客户端访问的路径附加在path上 例：/api/req => /ws => /ws/api/req
