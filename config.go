@@ -89,11 +89,11 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, runf func()) 
 			})
 			pub = r.Respon
 		}
-		if !strings.HasPrefix(t.TLS.Key, "http://") && !strings.HasPrefix(t.TLS.Pub, "https://") {
-			pf := pfile.New(t.TLS.Pub, 0, false)
+		if !strings.HasPrefix(t.TLS.Key, "http://") && !strings.HasPrefix(t.TLS.Key, "https://") {
+			pf := pfile.New(t.TLS.Key, 0, false)
 			pri, errPri = pf.ReadAll(humanize.KByte, humanize.MByte)
 			if errors.Is(errPri, io.EOF) {
-				errPub = nil
+				errPri = nil
 			}
 		} else {
 			r := reqf.New()
