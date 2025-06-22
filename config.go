@@ -79,6 +79,9 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, runf func()) 
 		if !strings.HasPrefix(t.TLS.Pub, "http://") && !strings.HasPrefix(t.TLS.Pub, "https://") {
 			pf := pfile.New(t.TLS.Pub, 0, false)
 			pub, errPub = pf.ReadAll(humanize.KByte, humanize.MByte)
+			if errors.Is(errPub, io.EOF) {
+				errPub = nil
+			}
 		} else {
 			r := reqf.New()
 			errPub = r.Reqf(reqf.Rval{
@@ -89,6 +92,9 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, runf func()) 
 		if !strings.HasPrefix(t.TLS.Key, "http://") && !strings.HasPrefix(t.TLS.Pub, "https://") {
 			pf := pfile.New(t.TLS.Pub, 0, false)
 			pri, errPri = pf.ReadAll(humanize.KByte, humanize.MByte)
+			if errors.Is(errPri, io.EOF) {
+				errPub = nil
+			}
 		} else {
 			r := reqf.New()
 			errPri = r.Reqf(reqf.Rval{
@@ -97,7 +103,7 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, runf func()) 
 			pri = r.Respon
 		}
 		if errPub != nil || errPri != nil {
-			logger.Error(`E:`, fmt.Sprintf("%v %v", t.Addr, errors.Join(errPub, errPri)))
+			logger.Error(`E:`, fmt.Sprintf("%v errPub(%v) errPri(%v)", t.Addr, errPub, errPri))
 		} else if cert, e := tls.X509KeyPair(pub, pri); e != nil {
 			logger.Error(`E:`, fmt.Sprintf("%v %v", t.Addr, e))
 		} else {
@@ -516,6 +522,17 @@ func (t *Route) SwapSign(logger Logger) {
 	if len(t.Path) == 0 || t.config == nil {
 		return
 	}
+
+	for i := 0; i < len(t.Backs); i++ {
+		t.Backs[i].route = t
+		if p, ok := t.backMap.Load(t.Backs[i].Id()); !ok {
+			logger.Info(`I:`, fmt.Sprintf("%v > %v > %v", t.config.Addr, t.Path, t.Backs[i].Name))
+			t.backMap.Store(t.Backs[i].Id(), &t.Backs[i])
+		} else if p.(*Back) != &t.Backs[i] {
+			logger.Info(`I:`, fmt.Sprintf("%v > %v ~ %v", t.config.Addr, t.Path, t.Backs[i].Name))
+		}
+	}
+
 	t.backMap.Range(func(key, value any) bool {
 		var exist bool
 		for k := 0; k < len(t.Backs); k++ {
@@ -525,20 +542,13 @@ func (t *Route) SwapSign(logger Logger) {
 			}
 		}
 		if !exist {
-			logger.Info(`I:`, fmt.Sprintf("%v > %v x %v", t.config.Addr, t.Path, value.(*Back).Name))
+			logger.Info(`I:`, fmt.Sprintf("%v > %v x %v", t.config.Addr, t.Path, key))
 			t.backMap.Delete(key)
+		} else {
+			value.(*Back).SwapSign(logger)
 		}
 		return true
 	})
-
-	for i := 0; i < len(t.Backs); i++ {
-		if _, ok := t.backMap.Load(t.Backs[i].Id()); !ok {
-			t.Backs[i].route = t
-			logger.Info(`I:`, fmt.Sprintf("%v > %v > %v", t.config.Addr, t.Path, t.Backs[i].Name))
-			t.backMap.Store(t.Backs[i].Id(), &t.Backs[i])
-		}
-		t.Backs[i].SwapSign(logger)
-	}
 }
 
 func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
@@ -677,7 +687,7 @@ func (t *Back) getDealerResBody() []dealer.Body {
 }
 
 func (t *Back) Id() string {
-	return fmt.Sprintf("%p", t)
+	return t.Name
 }
 
 func (t *Back) be(opT time.Time) {
