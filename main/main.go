@@ -123,31 +123,48 @@ func main() {
 				return
 			}
 
-			logger.L(`I:`, "重载端口", reloadPath)
-			logger.L(`I:`, "重起端口", restartPath)
-			logger.L(`I:`, "停止端口", stopPath)
+			webPath := &pweb.WebPath{}
+			webPath.Store(*adminPath+`reload`, func(w http.ResponseWriter, r *http.Request) {
+				if e := pfront.Load(ctx, configF, &configS, logger); e != nil {
+					_, _ = w.Write([]byte("err:" + e.Error()))
+				} else {
+					_, _ = w.Write([]byte("ok"))
+				}
+			})
+			webPath.Store(*adminPath+`restart`, func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte("ok"))
+				adminSign <- "restart"
+			})
+			webPath.Store(*adminPath+`stop`, func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte("ok"))
+				adminSign <- "stop"
+			})
 
-			adminSer := pweb.New(&http.Server{
-				Addr: fmt.Sprintf("127.0.0.1:%d", *adminPort),
-			})
-			adminSer.Handle(map[string]func(http.ResponseWriter, *http.Request){
-				*adminPath + `reload`: func(w http.ResponseWriter, r *http.Request) {
-					if e := pfront.Load(ctx, configF, &configS, logger); e != nil {
-						_, _ = w.Write([]byte("err:" + e.Error()))
-					} else {
-						_, _ = w.Write([]byte("ok"))
+			var hasErr = false
+			timer := time.NewTicker(time.Millisecond * 100)
+			defer timer.Stop()
+
+			for {
+				if adminSer, err := pweb.NewSyncMapNoPanic(&http.Server{
+					Addr: fmt.Sprintf("127.0.0.1:%d", *adminPort),
+				}, webPath); err == nil {
+					logger.L(`I:`, "重载端口", reloadPath)
+					logger.L(`I:`, "重起端口", restartPath)
+					logger.L(`I:`, "停止端口", stopPath)
+					adminCancle = func() { adminSer.Shutdown(ctx) }
+					break
+				} else {
+					select {
+					case <-ctx.Done():
+						return
+					case <-timer.C:
+						if !hasErr {
+							hasErr = true
+							logger.Warn(`W:`, fmt.Sprintf("%v. Retry...", err))
+						}
 					}
-				},
-				*adminPath + `restart`: func(w http.ResponseWriter, r *http.Request) {
-					_, _ = w.Write([]byte("ok"))
-					adminSign <- "restart"
-				},
-				*adminPath + `stop`: func(w http.ResponseWriter, r *http.Request) {
-					_, _ = w.Write([]byte("ok"))
-					adminSign <- "stop"
-				},
-			})
-			adminCancle = func() { adminSer.Shutdown(ctx) }
+				}
+			}
 		}
 
 		logger.L(`I:`, "启动")

@@ -110,7 +110,7 @@ func loadConfig(ctx context.Context, buf []byte, configS *[]Config, logger Logge
 		if e := json.Unmarshal(buf, configS); e != nil {
 			return e
 		}
-		for i := 0; e == nil && i < len(*configS); i++ {
+		for i := 0; i < len(*configS); i++ {
 			(*configS)[i].lock.Lock()
 			(*configS)[i].SwapSign(ctx, logger)
 			(*configS)[i].lock.Unlock()
