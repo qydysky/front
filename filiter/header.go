@@ -1,6 +1,7 @@
 package filiter
 
 import (
+	"encoding/json"
 	"net/http"
 	"regexp"
 
@@ -8,8 +9,20 @@ import (
 )
 
 type Header struct {
+	Id         uintptr                  `json:"-"`
 	AccessRule string                   `json:"accessRule"`
 	Items      map[string]HeaderFiliter `json:"items"`
+}
+
+func (t *Header) UnmarshalJSON(b []byte) error {
+	var s = Header{}
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	t.Id = getId(b)
+	t.AccessRule = s.AccessRule
+	t.Items = s.Items
+	return nil
 }
 
 func (t *Header) Valid() bool {

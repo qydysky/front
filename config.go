@@ -553,13 +553,13 @@ func (t *Route) SwapSign(logger Logger) {
 func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var backLink []*Back
 	var (
-		furi *filiter.Uri
-		fher *filiter.Header
+		furi uintptr
+		fher uintptr
 	)
 	for i := range t.Backs {
 
 		urip := t.Backs[i].getFiliterReqUri()
-		if (furi != nil || fher != nil) && urip != furi {
+		if (furi != 0 || fher != 0) && urip.Id != furi {
 			continue
 		}
 		if ok, e := urip.Match(r); !ok || e != nil {
@@ -567,7 +567,7 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 		}
 
 		herp := t.Backs[i].getFiliterReqHeader()
-		if (furi != nil || fher != nil) && urip != furi {
+		if (furi != 0 || fher != 0) && urip.Id != furi {
 			continue
 		}
 		if ok, e := herp.Match(r.Header); !ok || e != nil {
@@ -578,8 +578,8 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 			continue
 		}
 
-		furi = urip
-		fher = herp
+		furi = urip.Id
+		fher = herp.Id
 
 		t.Backs[i].route = t
 		backLink = append(backLink, &t.Backs[i])

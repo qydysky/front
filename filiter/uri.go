@@ -1,6 +1,7 @@
 package filiter
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"regexp"
@@ -9,8 +10,20 @@ import (
 )
 
 type Uri struct {
+	Id         uintptr           `json:"-"`
 	AccessRule string            `json:"accessRule"`
 	Items      map[string]string `json:"items"`
+}
+
+func (t *Uri) UnmarshalJSON(b []byte) error {
+	var s = Uri{}
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	t.Id = getId(b)
+	t.AccessRule = s.AccessRule
+	t.Items = s.Items
+	return nil
 }
 
 func (t *Uri) Valid() bool {
