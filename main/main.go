@@ -178,10 +178,10 @@ func main() {
 		}
 
 		for i := 0; i < len(configS); i++ {
-			if e, runf := configS[i].Run(ctx, logger); e != nil {
+			if e, shutdown := configS[i].Run(ctx, logger); e != nil {
 				return
 			} else {
-				go runf()
+				go shutdown()
 			}
 		}
 

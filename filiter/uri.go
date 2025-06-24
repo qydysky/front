@@ -17,13 +17,16 @@ type Uri struct {
 }
 
 func (t *Uri) UnmarshalJSON(b []byte) error {
-	var s = Uri{}
+	var s = struct {
+		Id         unique.Handle[string] `json:"-"`
+		AccessRule string                `json:"accessRule"`
+		Items      map[string]string     `json:"items"`
+	}{}
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	t.Id = unique.Make(string(b))
-	t.AccessRule = s.AccessRule
-	t.Items = s.Items
+	s.Id = unique.Make(string(b))
+	*t = s
 	return nil
 }
 

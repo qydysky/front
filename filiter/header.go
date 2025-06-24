@@ -16,13 +16,16 @@ type Header struct {
 }
 
 func (t *Header) UnmarshalJSON(b []byte) error {
-	var s = Header{}
+	var s = struct {
+		Id         unique.Handle[string]    `json:"-"`
+		AccessRule string                   `json:"accessRule"`
+		Items      map[string]HeaderFiliter `json:"items"`
+	}{}
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	t.Id = unique.Make(string(b))
-	t.AccessRule = s.AccessRule
-	t.Items = s.Items
+	s.Id = unique.Make(string(b))
+	*t = s
 	return nil
 }
 
