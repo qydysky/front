@@ -17,6 +17,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unique"
 
 	"github.com/dustin/go-humanize"
 	"github.com/qydysky/front/dealer"
@@ -553,13 +554,13 @@ func (t *Route) SwapSign(logger Logger) {
 func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var backLink []*Back
 	var (
-		furi uintptr
-		fher uintptr
+		furi *unique.Handle[string]
+		fher *unique.Handle[string]
 	)
 	for i := range t.Backs {
 
 		urip := t.Backs[i].getFiliterReqUri()
-		if (furi != 0 || fher != 0) && urip.Id != furi {
+		if (furi != nil || fher != nil) && &urip.Id != furi {
 			continue
 		}
 		if ok, e := urip.Match(r); !ok || e != nil {
@@ -567,7 +568,7 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 		}
 
 		herp := t.Backs[i].getFiliterReqHeader()
-		if (furi != 0 || fher != 0) && urip.Id != furi {
+		if (furi != nil || fher != nil) && &urip.Id != furi {
 			continue
 		}
 		if ok, e := herp.Match(r.Header); !ok || e != nil {
@@ -578,8 +579,8 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 			continue
 		}
 
-		furi = urip.Id
-		fher = herp.Id
+		furi = &urip.Id
+		fher = &herp.Id
 
 		t.Backs[i].route = t
 		backLink = append(backLink, &t.Backs[i])

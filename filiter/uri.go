@@ -5,14 +5,15 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"unique"
 
 	boolS "github.com/qydysky/part/bools"
 )
 
 type Uri struct {
-	Id         uintptr           `json:"-"`
-	AccessRule string            `json:"accessRule"`
-	Items      map[string]string `json:"items"`
+	Id         unique.Handle[string] `json:"-"`
+	AccessRule string                `json:"accessRule"`
+	Items      map[string]string     `json:"items"`
 }
 
 func (t *Uri) UnmarshalJSON(b []byte) error {
@@ -20,7 +21,7 @@ func (t *Uri) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	t.Id = getId(b)
+	t.Id = unique.Make(string(b))
 	t.AccessRule = s.AccessRule
 	t.Items = s.Items
 	return nil

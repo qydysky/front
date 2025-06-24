@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
+	"unique"
 
 	boolS "github.com/qydysky/part/bools"
 )
 
 type Header struct {
-	Id         uintptr                  `json:"-"`
+	Id         unique.Handle[string]    `json:"-"`
 	AccessRule string                   `json:"accessRule"`
 	Items      map[string]HeaderFiliter `json:"items"`
 }
@@ -19,7 +20,7 @@ func (t *Header) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	t.Id = getId(b)
+	t.Id = unique.Make(string(b))
 	t.AccessRule = s.AccessRule
 	t.Items = s.Items
 	return nil
