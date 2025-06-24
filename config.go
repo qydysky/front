@@ -552,13 +552,34 @@ func (t *Route) SwapSign(logger Logger) {
 
 func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var backLink []*Back
-	for i := 0; i < len(t.Backs); i++ {
-		if ok, e := t.Backs[i].getFiliterReqUri().Match(r); !ok || e != nil {
-			continue
+	var (
+		furi *filiter.Uri
+		fher *filiter.Header
+	)
+	for i := range t.Backs {
+		{
+			p := t.Backs[i].getFiliterReqUri()
+			if furi != nil && p != furi {
+				continue
+			}
+			if ok, e := p.Match(r); !ok || e != nil {
+				continue
+			}
+			if p.Valid() {
+				furi = p
+			}
 		}
-
-		if ok, e := t.Backs[i].getFiliterReqHeader().Match(r.Header); !ok || e != nil {
-			continue
+		{
+			p := t.Backs[i].getFiliterReqHeader()
+			if fher != nil && p != fher {
+				continue
+			}
+			if ok, e := p.Match(r.Header); !ok || e != nil {
+				continue
+			}
+			if p.Valid() {
+				fher = p
+			}
 		}
 
 		if !t.Backs[i].AlwaysUp && t.Backs[i].Weight == 0 {
@@ -727,7 +748,7 @@ func (t *Back) Disable() {
 }
 
 type Setting struct {
-	PathAdd  bool   `json:"pathAdd"`
+	PathAdd            bool            `json:"pathAdd"`
 	ErrToSec           float64         `json:"errToSec"`
 	Splicing           int             `json:"splicing"`
 	ErrBanSec          int             `json:"errBanSec"`
