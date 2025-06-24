@@ -32,7 +32,7 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 	)
 
 	path := chosenBack.To
-	if chosenBack.PathAdd() {
+	if chosenBack.getPathAdd() {
 		if s, e := url.PathUnescape(r.URL.Path); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
 			return ErrDealReqUri

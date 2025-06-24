@@ -43,7 +43,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 	)
 
 	url := chosenBack.To
-	if chosenBack.PathAdd() {
+	if chosenBack.getPathAdd() {
 		url += r.RequestURI
 	}
 

@@ -51,7 +51,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 	// 	chosenBack = backs[i]
 
 	url := chosenBack.To
-	if chosenBack.PathAdd() {
+	if chosenBack.getPathAdd() {
 		url += r.RequestURI
 	}
 

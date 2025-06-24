@@ -109,7 +109,6 @@ config:
     - *key*: string 私钥pem路径，支持从`http`/`https`获取
 - routes: [] 路由
     - path: []string 路径
-    - pathAdd: bool 将客户端访问的路径附加在path上 例：/api/req => /ws => /ws/api/req
     - rollRule: string 可选
         - `order`(按顺序，每次都从第一个开始尝试)
         - `loop`(轮流)
@@ -129,6 +128,7 @@ config:
 
 setting: setting代指下述各配置
 
+- pathAdd: bool 将客户端访问的路径附加在path上 例：/api/req => /ws => /ws/api/req
 - splicing: int 当客户端支持cookie时，将会固定使用后端多少秒，默认不启用
 - errToSec: float64 当后端响应超过(ws则指初次返回时间)指定秒，将会触发errBanSec
 - errBanSec: int 当后端错误时（指连接失败，不指后端错误响应），将会禁用若干秒

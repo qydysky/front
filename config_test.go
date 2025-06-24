@@ -44,8 +44,10 @@ func Test_Uri2(t *testing.T) {
 		Addr: "127.0.0.1:19000",
 		Routes: []Route{
 			{
-				Path:    []string{"//test/"},
-				PathAdd: true,
+				Path: []string{"//test/"},
+				Setting: Setting{
+					PathAdd: true,
+				},
 				Backs: []Back{
 					{
 						Name:   "1",
@@ -90,9 +92,9 @@ func Test_Uri(t *testing.T) {
 		Addr: "127.0.0.1:19000",
 		Routes: []Route{
 			{
-				Path:    []string{"/"},
-				PathAdd: true,
+				Path: []string{"/"},
 				Setting: Setting{
+					PathAdd: true,
 					Filiter: filiter.Filiter{
 						ReqUri: filiter.Uri{
 							AccessRule: "!{go}",
@@ -146,7 +148,9 @@ func Test_Back(t *testing.T) {
 		Routes: []Route{
 			{
 				Path:    []string{"/"},
-				PathAdd: true,
+				Setting: Setting{
+					PathAdd: true,
+				},
 				Backs:   []Back{},
 			},
 		},
@@ -217,7 +221,9 @@ func Test_Res(t *testing.T) {
 		Routes: []Route{
 			{
 				Path:    []string{"/"},
-				PathAdd: true,
+				Setting: Setting{
+					PathAdd: true,
+				},
 				Backs: []Back{
 					{
 						Name:   "1",
@@ -282,7 +288,9 @@ func Test_Cookie(t *testing.T) {
 		Routes: []Route{
 			{
 				Path:    []string{"/"},
-				PathAdd: true,
+				Setting: Setting{
+					PathAdd: true,
+				},
 				Backs: []Back{
 					{
 						Name:   "1",
@@ -334,7 +342,9 @@ func Test_Retry(t *testing.T) {
 		Routes: []Route{
 			{
 				Path:     []string{"/"},
-				PathAdd:  true,
+				Setting: Setting{
+					PathAdd: true,
+				},
 				RollRule: "order",
 				Backs: []Back{
 					{
@@ -386,9 +396,9 @@ func Test_ResBody(t *testing.T) {
 		Routes: []Route{
 			{
 				Path:     []string{"/"},
-				PathAdd:  true,
 				RollRule: "order",
 				Setting: Setting{
+					PathAdd: true,
 					Dealer: dealer.Dealer{
 						ResBody: []dealer.Body{
 							{

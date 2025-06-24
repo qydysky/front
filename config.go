@@ -505,7 +505,6 @@ type Route struct {
 	config *Config  `json:"-"`
 	Path   []string `json:"path"`
 
-	PathAdd  bool   `json:"pathAdd"`
 	RollRule string `json:"rollRule"`
 	// ReqBody  filiter.Body `json:"reqBody"`
 	Setting
@@ -621,8 +620,8 @@ func (t *Back) getSplicing() int {
 	}
 	return t.Splicing
 }
-func (t *Back) PathAdd() bool {
-	return t.route.PathAdd
+func (t *Back) getPathAdd() bool {
+	return t.route.PathAdd || t.PathAdd
 }
 func (t *Back) getErrBanSec() int {
 	if t.ErrBanSec == 0 {
@@ -728,6 +727,7 @@ func (t *Back) Disable() {
 }
 
 type Setting struct {
+	PathAdd  bool   `json:"pathAdd"`
 	ErrToSec           float64         `json:"errToSec"`
 	Splicing           int             `json:"splicing"`
 	ErrBanSec          int             `json:"errBanSec"`
