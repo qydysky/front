@@ -559,7 +559,7 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	for i := range t.Backs {
 		{
 			p := t.Backs[i].getFiliterReqUri()
-			if furi != nil && p != furi {
+			if (furi != nil || fher != nil) && p != furi {
 				continue
 			}
 			if ok, e := p.Match(r); !ok || e != nil {
@@ -571,7 +571,7 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 		}
 		{
 			p := t.Backs[i].getFiliterReqHeader()
-			if fher != nil && p != fher {
+			if (furi != nil || fher != nil) && p != fher {
 				continue
 			}
 			if ok, e := p.Match(r.Header); !ok || e != nil {
