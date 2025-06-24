@@ -557,34 +557,29 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 		fher *filiter.Header
 	)
 	for i := range t.Backs {
-		{
-			p := t.Backs[i].getFiliterReqUri()
-			if (furi != nil || fher != nil) && p != furi {
-				continue
-			}
-			if ok, e := p.Match(r); !ok || e != nil {
-				continue
-			}
-			if p.Valid() {
-				furi = p
-			}
+
+		urip := t.Backs[i].getFiliterReqUri()
+		if (furi != nil || fher != nil) && urip != furi {
+			continue
 		}
-		{
-			p := t.Backs[i].getFiliterReqHeader()
-			if (furi != nil || fher != nil) && p != fher {
-				continue
-			}
-			if ok, e := p.Match(r.Header); !ok || e != nil {
-				continue
-			}
-			if p.Valid() {
-				fher = p
-			}
+		if ok, e := urip.Match(r); !ok || e != nil {
+			continue
+		}
+
+		herp := t.Backs[i].getFiliterReqHeader()
+		if (furi != nil || fher != nil) && urip != furi {
+			continue
+		}
+		if ok, e := herp.Match(r.Header); !ok || e != nil {
+			continue
 		}
 
 		if !t.Backs[i].AlwaysUp && t.Backs[i].Weight == 0 {
 			continue
 		}
+
+		furi = urip
+		fher = herp
 
 		t.Backs[i].route = t
 		backLink = append(backLink, &t.Backs[i])
