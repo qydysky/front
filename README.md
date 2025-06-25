@@ -15,13 +15,19 @@
 
 支持嵌入到其他项目中/独立运行
 ```
-Usage of main:
+Usage of ./main:
   -adminPath string
         adminPath, eg:/123/12/
   -adminPort int
         adminPort, eg:10908
   -c string
         config (default "main.json")
+  -decrypt string
+        decrypt
+  -encrypt string
+        encrypt
+  -genKey
+        genKey
   -logFile string
         logFile, defalut no log file
   -noAutoReload
