@@ -94,20 +94,17 @@ func main() {
 			pubKey, _ := pem.Decode(data)
 			defer clear(pubKey.Bytes)
 
-			if enc, e := pca.ChoseAsymmetricByPem(pubKey).Decrypt(pubKey); e != nil {
+			if enc, e := pca.ChoseAsymmetricByPem(pubKey).Encrypt(pubKey); e != nil {
 				os.Stderr.Write([]byte(e.Error()))
 				return
 			} else {
 				buf := bytes.NewBuffer([]byte{})
 				io.Copy(buf, os.Stdin)
-				b, ext := pca.Unpack(buf.Bytes())
-				defer clear(b)
-				defer clear(ext)
-
-				if s, e := enc(pcs.Chacha20poly1305F, b, ext); e != nil {
+				if b, ext, e := enc(pcs.Chacha20poly1305F, buf.Bytes()); e != nil {
 					os.Stderr.Write([]byte(e.Error()))
+					return
 				} else {
-					os.Stdout.Write(s)
+					os.Stdout.Write(pca.Pack(b, ext))
 				}
 				return
 			}
