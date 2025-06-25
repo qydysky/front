@@ -1,83 +1,21 @@
 [
-  {
-    "addr": "127.0.0.1:0",
-    "matchRule": "prefix",
-    "tls": {
-      "pub": "",
-      "key": ""
-    },
-    "retryBlocks": {
-      "size": 10,
-      "num": 10
-    },
-    "routes": [
-      {
-        "path": [""],
-        "pathAdd": false,
-        "rollRule": "",
-        "splicing": 0,
-        "errToSec": 0,
-        "errBanSec": 0,
-        "insecureSkipVerify": false,
-        "verifyPeerCer": "",
-        "filiter": {
-          "reqUri": {
-            "accessRule": "",
-            "items": {
-              "": ""
-            }
-          },
-          "reqHeader": {
-            "accessRule": "",
-            "items": {
-              "": {
-                "key": "",
-                "matchExp": ""
-              }
-            }
-          },
-          "resHeader": {
-            "accessRule": "",
-            "items": {
-              "": {
-                "key": "",
-                "matchExp": ""
-              }
-            }
-          },
-          "reqBody": {
-            "action": "",
-            "reqSize": "1M",
-            "matchExp": ""
-          }
-        },
-        "dealer": {
-          "reqHeader": [
+    {
+        "addr": "0.0.0.0:20000",
+        "matchRule": "prefix",
+        "routes": [
             {
-              "action": "",
-              "key": "",
-              "matchExp": "",
-              "value": ""
+                "path": [
+                    "/"
+                ],
+                "pathAdd": true,
+                "backs": [
+                    {
+                        "name": "b1",
+                        "to": "./",
+                        "weight": "1"
+                    }
+                ]
             }
-          ],
-          "resHeader": [
-            {
-              "action": "",
-              "key": "",
-              "matchExp": "",
-              "value": ""
-            }
-          ]
-        },
-        "backs": [
-          {
-            "name": "b1",
-            "to": "",
-            "weight": "1",
-            "alwaysUp": false
-          }
         ]
-      }
-    ]
-  }
+    }
 ]
