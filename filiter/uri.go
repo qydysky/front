@@ -1,33 +1,16 @@
 package filiter
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"regexp"
-	"unique"
 
 	boolS "github.com/qydysky/part/bools"
 )
 
 type Uri struct {
-	Id         unique.Handle[string] `json:"-"`
-	AccessRule string                `json:"accessRule"`
-	Items      map[string]string     `json:"items"`
-}
-
-func (t *Uri) UnmarshalJSON(b []byte) error {
-	var s = struct {
-		Id         unique.Handle[string] `json:"-"`
-		AccessRule string                `json:"accessRule"`
-		Items      map[string]string     `json:"items"`
-	}{}
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-	s.Id = unique.Make(string(b))
-	*t = s
-	return nil
+	AccessRule string            `json:"accessRule"`
+	Items      map[string]string `json:"items"`
 }
 
 func (t *Uri) Valid() bool {

@@ -91,10 +91,19 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		return MarkRetry(ErrResFail)
 	}
 
-	if ok, e := chosenBack.getFiliterResHeader().Match(resp.Header); e != nil {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-	} else if !ok {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrHeaderCheckFail, time.Since(opT)))
+	var noPassFiliter bool
+	for filiter := range chosenBack.getFiliters() {
+		noPassFiliter = true
+		if ok, e := filiter.ResHeader.Match(resp.Header); e != nil {
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+		} else if !ok {
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrHeaderCheckFail, time.Since(opT)))
+			continue
+		}
+		noPassFiliter = false
+		break
+	}
+	if noPassFiliter {
 		w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
 		return MarkRetry(ErrHeaderCheckFail)
 	}

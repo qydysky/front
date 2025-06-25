@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"math"
 	"net"
 	"net/http"
@@ -209,29 +210,34 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 			return
 		}
 
-		if ok, e := route.Filiter.ReqUri.Match(r); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
-		} else if !ok {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrPatherCheckFail))
-			w.Header().Add(header+"Error", ErrPatherCheckFail.Error())
-			w.WriteHeader(http.StatusForbidden)
-			return
-		}
+		var noPassFiliter bool
+		for filiter := range route.getFiliters() {
+			noPassFiliter = true
+			if ok, e := filiter.ReqUri.Match(r); e != nil {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+			} else if !ok {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrPatherCheckFail))
+				continue
+			}
 
-		if ok, e := route.Filiter.ReqHeader.Match(r.Header); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
-		} else if !ok {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrHeaderCheckFail))
-			w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
-			w.WriteHeader(http.StatusForbidden)
-			return
-		}
+			if ok, e := filiter.ReqHeader.Match(r.Header); e != nil {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+			} else if !ok {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrHeaderCheckFail))
+				continue
+			}
 
-		if ok, e := route.Filiter.ReqBody.Match(r); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
-		} else if !ok {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrBodyCheckFail))
-			w.Header().Add(header+"Error", ErrBodyCheckFail.Error())
+			if ok, e := filiter.ReqBody.Match(r); e != nil {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+			} else if !ok {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrBodyCheckFail))
+				continue
+			}
+			noPassFiliter = false
+			break
+		}
+		if noPassFiliter {
+			w.Header().Add(header+"Error", ErrCheckFail.Error())
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
@@ -246,20 +252,21 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 		{
 			if t, e := r.Cookie("_psign_" + cookie); e == nil {
 				if backP, aok := route.backMap.Load(t.Value); aok {
-					var filiter = func(b *Back) (error, bool) {
-						if ok, e := b.getFiliterReqUri().Match(r); e != nil || !ok {
-							return e, ok
+					var noPassFiliter bool
+					for filiter := range backP.(*Back).getFiliters() {
+						noPassFiliter = true
+						if ok, e := filiter.ReqUri.Match(r); !ok || e != nil {
+							logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+							continue
 						}
-
-						if ok, e := b.getFiliterReqHeader().Match(r.Header); e != nil || !ok {
-							return e, ok
+						if ok, e := filiter.ReqHeader.Match(r.Header); !ok || e != nil {
+							logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+							continue
 						}
-						return nil, true
+						noPassFiliter = false
+						break
 					}
-
-					if e, ok := filiter(backP.(*Back)); e != nil {
-						logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
-					} else if ok {
+					if noPassFiliter {
 						backIs = addIfNotExsit(backIs, backEqual, backP.(*Back))
 					}
 				}
@@ -518,6 +525,16 @@ func (t *Route) Id() string {
 	return fmt.Sprintf("%p", t)
 }
 
+func (t *Route) getFiliters() (f iter.Seq[*filiter.Filiter]) {
+	return func(yield func(*filiter.Filiter) bool) {
+		for i := 0; i < len(t.Filiters); i++ {
+			if !yield(t.Filiters[i]) {
+				return
+			}
+		}
+	}
+}
+
 func (t *Route) SwapSign(logger Logger) {
 	if len(t.Path) == 0 || t.config == nil {
 		return
@@ -553,34 +570,31 @@ func (t *Route) SwapSign(logger Logger) {
 
 func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var backLink []*Back
-	var (
-		furi *unique.Handle[string]
-		fher *unique.Handle[string]
-	)
+	var passFiliter *unique.Handle[string]
 	for i := range t.Backs {
 
-		urip := t.Backs[i].getFiliterReqUri()
-		if (furi != nil || fher != nil) && &urip.Id != furi {
+		var noPassFiliter bool
+		for filiter := range t.Backs[i].getFiliters() {
+			noPassFiliter = true
+			if passFiliter != nil && filiter.Id() != passFiliter {
+				continue
+			}
+			if ok, e := filiter.ReqUri.Match(r); !ok || e != nil {
+				continue
+			}
+			if ok, e := filiter.ReqHeader.Match(r.Header); !ok || e != nil {
+				continue
+			}
+			passFiliter = filiter.Id()
+			noPassFiliter = false
+			break
+		}
+		if noPassFiliter {
 			continue
 		}
-		if ok, e := urip.Match(r); !ok || e != nil {
-			continue
-		}
-
-		herp := t.Backs[i].getFiliterReqHeader()
-		if (furi != nil || fher != nil) && &urip.Id != furi {
-			continue
-		}
-		if ok, e := herp.Match(r.Header); !ok || e != nil {
-			continue
-		}
-
 		if !t.Backs[i].AlwaysUp && t.Backs[i].Weight == 0 {
 			continue
 		}
-
-		furi = &urip.Id
-		fher = &herp.Id
 
 		t.Backs[i].route = t
 		backLink = append(backLink, &t.Backs[i])
@@ -660,27 +674,42 @@ func (t *Back) getInsecureSkipVerify() bool {
 func (t *Back) getVerifyPeerCer() (cer []byte, e error) {
 	return t.verifyPeerCer, t.verifyPeerCerErr
 }
-func (t *Back) getFiliterReqHeader() *filiter.Header {
-	if !t.Filiter.ReqHeader.Valid() {
-		return &t.route.Filiter.ReqHeader
-	} else {
-		return &t.Filiter.ReqHeader
+func (t *Back) getFiliters() (f iter.Seq[*filiter.Filiter]) {
+	return func(yield func(*filiter.Filiter) bool) {
+		for i := 0; i < len(t.route.Filiters); i++ {
+			if !yield(t.route.Filiters[i]) {
+				return
+			}
+		}
+		for i := 0; i < len(t.Filiters); i++ {
+			if !yield(t.Filiters[i]) {
+				return
+			}
+		}
 	}
 }
-func (t *Back) getFiliterReqUri() *filiter.Uri {
-	if !t.Filiter.ReqUri.Valid() {
-		return &t.route.Filiter.ReqUri
-	} else {
-		return &t.Filiter.ReqUri
-	}
-}
-func (t *Back) getFiliterResHeader() *filiter.Header {
-	if !t.Filiter.ResHeader.Valid() {
-		return &t.route.Filiter.ResHeader
-	} else {
-		return &t.Filiter.ResHeader
-	}
-}
+
+// func (t *Back) getFiliterReqHeader() *filiter.Header {
+// 	if !t.Filiter.ReqHeader.Valid() {
+// 		return &t.route.Filiter.ReqHeader
+// 	} else {
+// 		return &t.Filiter.ReqHeader
+// 	}
+// }
+// func (t *Back) getFiliterReqUri() *filiter.Uri {
+// 	if !t.Filiter.ReqUri.Valid() {
+// 		return &t.route.Filiter.ReqUri
+// 	} else {
+// 		return &t.Filiter.ReqUri
+// 	}
+// }
+// func (t *Back) getFiliterResHeader() *filiter.Header {
+// 	if !t.Filiter.ResHeader.Valid() {
+// 		return &t.route.Filiter.ResHeader
+// 	} else {
+// 		return &t.Filiter.ResHeader
+// 	}
+// }
 
 //	func (t *Back) getFiliterResBody() *filiter.Body {
 //		if !t.Filiter.ReqBody.Valid() {
@@ -744,15 +773,15 @@ func (t *Back) Disable() {
 }
 
 type Setting struct {
-	PathAdd            bool            `json:"pathAdd"`
-	ErrToSec           float64         `json:"errToSec"`
-	Splicing           int             `json:"splicing"`
-	ErrBanSec          int             `json:"errBanSec"`
-	InsecureSkipVerify bool            `json:"insecureSkipVerify"`
-	VerifyPeerCer      string          `json:"verifyPeerCer"`
-	Proxy              string          `json:"proxy"`
-	Filiter            filiter.Filiter `json:"filiter"`
-	Dealer             dealer.Dealer   `json:"dealer"`
+	PathAdd            bool               `json:"pathAdd"`
+	ErrToSec           float64            `json:"errToSec"`
+	Splicing           int                `json:"splicing"`
+	ErrBanSec          int                `json:"errBanSec"`
+	InsecureSkipVerify bool               `json:"insecureSkipVerify"`
+	VerifyPeerCer      string             `json:"verifyPeerCer"`
+	Proxy              string             `json:"proxy"`
+	Filiters           []*filiter.Filiter `json:"filiters"`
+	Dealer             dealer.Dealer      `json:"dealer"`
 	verifyPeerCer      []byte
 	verifyPeerCerErr   error
 }

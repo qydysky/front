@@ -3,6 +3,7 @@ package front
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"testing"
@@ -24,6 +25,96 @@ var logger = plog.New(plog.Config{
 		`E:`: plog.On,
 	},
 })
+
+func Test_Uri3(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	web := pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	})
+	web.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/test/1`: func(w http.ResponseWriter, r *http.Request) {
+			io.Copy(w, r.Body)
+		},
+		`/test/2`: func(w http.ResponseWriter, r *http.Request) {
+			io.Copy(w, r.Body)
+		},
+	})
+
+	defer web.Shutdown()
+
+	time.Sleep(time.Second)
+
+	j := []byte(`
+	{
+		"addr": "127.0.0.1:19000",
+		"routes": [
+			{
+				"path": ["/test/"],
+				"pathAdd": true,
+				"backs": [
+					{
+						"name": "1",
+						"to": "://127.0.0.1:19001",
+						"filiter": [
+							{
+								"reqUri": {
+									"accessRule": "{f}",
+									"items": {
+										"f": "\/test\/2"
+									}
+								}
+							},
+							{
+								"reqUri": {
+									"accessRule": "{f}",
+									"items": {
+										"f": "\/test\/1"
+									}
+								}
+							}
+						]
+					}
+				]
+			}
+		]
+	}
+	`)
+
+	conf := &Config{}
+	if e := json.Unmarshal(j, conf); e != nil {
+		t.Fatal(e)
+	}
+
+	if e, shutdown := conf.Run(ctx, logger); e != nil {
+		t.Fatal(e)
+	} else {
+		go shutdown()
+	}
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	r.Reqf(reqf.Rval{
+		Ctx:     ctx,
+		Url:     "http://127.0.0.1:19000/test/1",
+		PostStr: "123",
+	})
+
+	if string(r.Respon) != "123" {
+		t.Fatal(string(r.Respon))
+	}
+	r.Reqf(reqf.Rval{
+		Ctx:     ctx,
+		Url:     "http://127.0.0.1:19000/test/2",
+		PostStr: "123",
+	})
+
+	if string(r.Respon) != "123" {
+		t.Fatal(string(r.Respon))
+	}
+}
 
 func Test_Uri2(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -59,7 +150,11 @@ func Test_Uri2(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)
+	if e, shutdown := conf.Run(ctx, logger); e != nil {
+		t.Fatal(e)
+	} else {
+		go shutdown()
+	}
 
 	time.Sleep(time.Second)
 
@@ -88,21 +183,23 @@ func Test_Uri(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	customFiliter := &filiter.Filiter{
+		ReqUri: filiter.Uri{
+			AccessRule: "!{go}",
+			Items: map[string]string{
+				"go": "\\.go$",
+			},
+		},
+	}
+
 	conf := &Config{
 		Addr: "127.0.0.1:19000",
 		Routes: []Route{
 			{
 				Path: []string{"/"},
 				Setting: Setting{
-					PathAdd: true,
-					Filiter: filiter.Filiter{
-						ReqUri: filiter.Uri{
-							AccessRule: "!{go}",
-							Items: map[string]string{
-								"go": "\\.go$",
-							},
-						},
-					},
+					PathAdd:  true,
+					Filiters: []*filiter.Filiter{customFiliter},
 				},
 				Backs: []Back{
 					{
@@ -115,7 +212,11 @@ func Test_Uri(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)
+	if e, shutdown := conf.Run(ctx, logger); e != nil {
+		t.Fatal(e)
+	} else {
+		go shutdown()
+	}
 
 	time.Sleep(time.Second)
 
@@ -130,7 +231,7 @@ func Test_Uri(t *testing.T) {
 		t.Fail()
 	}
 
-	conf.Routes[0].Setting.Filiter.ReqUri.AccessRule = "{go}"
+	customFiliter.ReqUri.AccessRule = "{go}"
 
 	if e := r.Reqf(reqf.Rval{
 		Url: "http://127.0.0.1:19000/config_test.go",
@@ -147,16 +248,20 @@ func Test_Back(t *testing.T) {
 		Addr: "127.0.0.1:19000",
 		Routes: []Route{
 			{
-				Path:    []string{"/"},
+				Path: []string{"/"},
 				Setting: Setting{
 					PathAdd: true,
 				},
-				Backs:   []Back{},
+				Backs: []Back{},
 			},
 		},
 	}
 
-	go conf.Run(ctx, logger)
+	if e, shutdown := conf.Run(ctx, logger); e != nil {
+		t.Fatal(e)
+	} else {
+		go shutdown()
+	}
 
 	time.Sleep(time.Second)
 
@@ -220,7 +325,7 @@ func Test_Res(t *testing.T) {
 		Addr: "127.0.0.1:19000",
 		Routes: []Route{
 			{
-				Path:    []string{"/"},
+				Path: []string{"/"},
 				Setting: Setting{
 					PathAdd: true,
 				},
@@ -235,7 +340,11 @@ func Test_Res(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)
+	if e, shutdown := conf.Run(ctx, logger); e != nil {
+		t.Fatal(e)
+	} else {
+		go shutdown()
+	}
 
 	time.Sleep(time.Second)
 
@@ -269,7 +378,7 @@ func Test_Cookie(t *testing.T) {
 	c3 := "ts=11111111111"
 
 	pweb.New(&http.Server{
-		Addr: "127.0.0.1:19001",
+		Addr: "127.0.0.1:19002",
 	}).Handle(map[string]func(http.ResponseWriter, *http.Request){
 		`/`: func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("Set-Cookie", c1)
@@ -287,14 +396,14 @@ func Test_Cookie(t *testing.T) {
 		Addr: "127.0.0.1:19000",
 		Routes: []Route{
 			{
-				Path:    []string{"/"},
+				Path: []string{"/"},
 				Setting: Setting{
 					PathAdd: true,
 				},
 				Backs: []Back{
 					{
 						Name:   "1",
-						To:     "://127.0.0.1:19001",
+						To:     "://127.0.0.1:19002",
 						Weight: 1,
 					},
 				},
@@ -302,21 +411,26 @@ func Test_Cookie(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)
+	if e, shutdown := conf.Run(ctx, logger); e != nil {
+		t.Fatal(e)
+	} else {
+		go shutdown()
+	}
 
 	time.Sleep(time.Second)
 
 	r := reqf.New()
 	if e := r.Reqf(reqf.Rval{
-		Url: "http://127.0.0.1:19000/",
+		Url:     "http://127.0.0.1:19000/",
+		PostStr: "123",
 	}); e != nil {
 		t.Fatal()
 	}
 
 	if v, ok := map[string][]string(r.Response.Header)["Set-Cookie"]; !ok {
-		t.Fail()
+		t.Fatal(r.Response.Header)
 	} else if v[0] != c1 || v[1] != c2 || v[2] != c3 {
-		t.Fail()
+		t.Fatal()
 	}
 	// t.Log(r.Response.Header)
 }
@@ -341,7 +455,7 @@ func Test_Retry(t *testing.T) {
 		Addr: "127.0.0.1:19000",
 		Routes: []Route{
 			{
-				Path:     []string{"/"},
+				Path: []string{"/"},
 				Setting: Setting{
 					PathAdd: true,
 				},
@@ -362,7 +476,11 @@ func Test_Retry(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)
+	if e, shutdown := conf.Run(ctx, logger); e != nil {
+		t.Fatal(e)
+	} else {
+		go shutdown()
+	}
 
 	time.Sleep(time.Second)
 
@@ -420,7 +538,11 @@ func Test_ResBody(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)
+	if e, shutdown := conf.Run(ctx, logger); e != nil {
+		t.Fatal(e)
+	} else {
+		go shutdown()
+	}
 
 	time.Sleep(time.Second)
 

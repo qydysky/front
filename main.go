@@ -187,6 +187,7 @@ var (
 	ErrResFail           = errors.New("ErrResFail")
 	ErrResTO             = errors.New("ErrResTO")
 	ErrUriTooLong        = errors.New("ErrUriTooLong")
+	ErrCheckFail         = errors.New("ErrCheckFail")
 	ErrPatherCheckFail   = errors.New("ErrPatherCheckFail")
 	ErrHeaderCheckFail   = errors.New("ErrHeaderCheckFail")
 	ErrBodyCheckFail     = errors.New("ErrBodyCheckFail")
