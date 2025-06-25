@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +15,8 @@ import (
 	"time"
 
 	pfront "github.com/qydysky/front"
+	pca "github.com/qydysky/part/crypto/asymmetric"
+	pcs "github.com/qydysky/part/crypto/symmetric"
 	pctx "github.com/qydysky/part/ctx"
 	pfile "github.com/qydysky/part/file"
 	plog "github.com/qydysky/part/log"
@@ -36,8 +41,78 @@ func main() {
 		noLog        = flag.Bool("noLog", false, "noLog")
 		noDebugLog   = flag.Bool("noDebugLog", false, "noDebugLog")
 		noAutoReload = flag.Bool("noAutoReload", false, "noAutoReload")
+		genKey       = flag.Bool("genKey", false, "genKey")
+		decrypt      = flag.String("decrypt", "", "decrypt")
+		encrypt      = flag.String("encrypt", "", "encrypt")
 	)
 	flag.Parse()
+
+	if *genKey {
+		if pri, pub, e := pca.MlkemF.NewKey(); e != nil {
+			panic(e)
+		} else {
+			fmt.Println("公钥(用于-encrypt)：")
+			fmt.Println(string(pem.EncodeToMemory(pub)))
+			fmt.Println("私钥(用于-decrypt)：")
+			fmt.Println(string(pem.EncodeToMemory(pri)))
+			fmt.Println("请复制以上公私钥并另存为文件")
+			os.Exit(0)
+		}
+	}
+	if *decrypt != "" {
+		if data, err := fileLoad(*decrypt); err != nil {
+			os.Stderr.Write([]byte(err.Error()))
+			return
+		} else {
+			priKey, _ := pem.Decode(data)
+			defer clear(priKey.Bytes)
+
+			if dec, e := pca.ChoseAsymmetricByPem(priKey).Decrypt(priKey); e != nil {
+				os.Stderr.Write([]byte(e.Error()))
+				return
+			} else {
+				buf := bytes.NewBuffer([]byte{})
+				io.Copy(buf, os.Stdin)
+				b, ext := pca.Unpack(buf.Bytes())
+				defer clear(b)
+				defer clear(ext)
+
+				if s, e := dec(pcs.Chacha20poly1305F, b, ext); e != nil {
+					os.Stderr.Write([]byte(e.Error()))
+				} else {
+					os.Stdout.Write(s)
+				}
+				return
+			}
+		}
+	}
+	if *encrypt != "" {
+		if data, err := fileLoad(*encrypt); err != nil {
+			os.Stderr.Write([]byte(err.Error()))
+			return
+		} else {
+			pubKey, _ := pem.Decode(data)
+			defer clear(pubKey.Bytes)
+
+			if enc, e := pca.ChoseAsymmetricByPem(pubKey).Decrypt(pubKey); e != nil {
+				os.Stderr.Write([]byte(e.Error()))
+				return
+			} else {
+				buf := bytes.NewBuffer([]byte{})
+				io.Copy(buf, os.Stdin)
+				b, ext := pca.Unpack(buf.Bytes())
+				defer clear(b)
+				defer clear(ext)
+
+				if s, e := enc(pcs.Chacha20poly1305F, b, ext); e != nil {
+					os.Stderr.Write([]byte(e.Error()))
+				} else {
+					os.Stdout.Write(s)
+				}
+				return
+			}
+		}
+	}
 
 	// ctrl+c退出
 	var interrupt = make(chan os.Signal, 2)
@@ -94,7 +169,10 @@ func main() {
 				}); e != nil {
 					logger.L(`E:`, "reload", e)
 				} else {
-					logger.L(`I:`, "reload", string(r.Respon))
+					r.Respon(func(b []byte) error {
+						logger.L(`I:`, "reload", string(b))
+						return nil
+					})
 				}
 				return
 			}
@@ -106,7 +184,10 @@ func main() {
 				}); e != nil {
 					logger.L(`E:`, "stop", e)
 				} else {
-					logger.L(`I:`, "stop", string(r.Respon))
+					r.Respon(func(b []byte) error {
+						logger.L(`I:`, "stop", string(b))
+						return nil
+					})
 				}
 				return
 			}
@@ -118,7 +199,10 @@ func main() {
 				}); e != nil {
 					logger.L(`E:`, "restart", e)
 				} else {
-					logger.L(`I:`, "restart", string(r.Respon))
+					r.Respon(func(b []byte) error {
+						logger.L(`I:`, "restart", string(b))
+						return nil
+					})
 				}
 				return
 			}
@@ -205,4 +289,19 @@ func main() {
 			logger.L(`I:`, "退出")
 		}
 	}
+}
+
+func fileLoad(path string) (data []byte, err error) {
+	fileObject, e := os.OpenFile(path, os.O_RDONLY, 0644)
+	if e != nil {
+		err = e
+		return
+	}
+	defer fileObject.Close()
+	data, e = io.ReadAll(fileObject)
+	if e != nil {
+		err = e
+		return
+	}
+	return
 }

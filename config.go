@@ -92,7 +92,10 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, shutdown func
 			errPub = r.Reqf(reqf.Rval{
 				Url: t.TLS.Pub,
 			})
-			pub = r.Respon
+			r.Respon(func(b []byte) error {
+				pub = b
+				return nil
+			})
 		}
 		if !strings.HasPrefix(t.TLS.Key, "http://") && !strings.HasPrefix(t.TLS.Key, "https://") {
 			pf := pfile.New(t.TLS.Key, 0, false)
@@ -105,7 +108,10 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, shutdown func
 			errPri = r.Reqf(reqf.Rval{
 				Url: t.TLS.Key,
 			})
-			pri = r.Respon
+			r.Respon(func(b []byte) error {
+				pri = b
+				return nil
+			})
 		}
 		if len(pri) > 0 && len(t.TLS.Decrypt) > 0 {
 			var buf = bytes.NewBuffer([]byte{})

@@ -102,18 +102,24 @@ func Test_Uri3(t *testing.T) {
 		PostStr: "123",
 	})
 
-	if string(r.Respon) != "123" {
-		t.Fatal(string(r.Respon))
-	}
+	r.Respon(func(b []byte) error {
+		if string(b) != "123" {
+			t.Fatal(string(b))
+		}
+		return nil
+	})
 	r.Reqf(reqf.Rval{
 		Ctx:     ctx,
 		Url:     "http://127.0.0.1:19000/test/2",
 		PostStr: "123",
 	})
 
-	if string(r.Respon) != "123" {
-		t.Fatal(string(r.Respon))
-	}
+	r.Respon(func(b []byte) error {
+		if string(b) != "123" {
+			t.Fatal(string(b))
+		}
+		return nil
+	})
 }
 
 func Test_Uri2(t *testing.T) {
@@ -224,9 +230,12 @@ func Test_Uri(t *testing.T) {
 	if e := r.Reqf(reqf.Rval{
 		Url: "http://127.0.0.1:19000/config_test.go",
 	}); e != nil {
-		if r.Response.StatusCode != http.StatusForbidden {
-			t.Fail()
-		}
+		r.Response(func(r *http.Response) error {
+			if r.StatusCode != http.StatusForbidden {
+				t.Fail()
+			}
+			return nil
+		})
 	} else {
 		t.Fail()
 	}
@@ -269,11 +278,14 @@ func Test_Back(t *testing.T) {
 	if e := r.Reqf(reqf.Rval{
 		Url: "http://127.0.0.1:19000/config_test.go",
 	}); e != nil {
-		if r.Response.StatusCode != http.StatusNotFound {
-			t.Fail()
-		}
+		r.Response(func(r *http.Response) error {
+			if r.StatusCode != http.StatusNotFound {
+				t.Fatal(r.StatusCode)
+			}
+			return nil
+		})
 	} else {
-		t.Fail()
+		t.Fatal()
 	}
 
 	conf.Routes[0].Backs = append(conf.Routes[0].Backs,
@@ -288,7 +300,7 @@ func Test_Back(t *testing.T) {
 	if e := r.Reqf(reqf.Rval{
 		Url: "http://127.0.0.1:19000/config_test.go",
 	}); e != nil {
-		t.Fail()
+		t.Fatal()
 	}
 
 	conf.Routes[0].Backs = conf.Routes[0].Backs[:0]
@@ -297,11 +309,14 @@ func Test_Back(t *testing.T) {
 	if e := r.Reqf(reqf.Rval{
 		Url: "http://127.0.0.1:19000/config_test.go",
 	}); e != nil {
-		if r.Response.StatusCode != http.StatusNotFound {
-			t.Fail()
-		}
+		r.Response(func(r *http.Response) error {
+			if r.StatusCode != http.StatusNotFound {
+				t.Fatal()
+			}
+			return nil
+		})
 	} else {
-		t.Fail()
+		t.Fatal()
 	}
 }
 
@@ -427,11 +442,14 @@ func Test_Cookie(t *testing.T) {
 		t.Fatal()
 	}
 
-	if v, ok := map[string][]string(r.Response.Header)["Set-Cookie"]; !ok {
-		t.Fatal(r.Response.Header)
-	} else if v[0] != c1 || v[1] != c2 || v[2] != c3 {
-		t.Fatal()
-	}
+	r.Response(func(r *http.Response) error {
+		if v, ok := map[string][]string(r.Header)["Set-Cookie"]; !ok {
+			t.Fatal(r.Header)
+		} else if v[0] != c1 || v[1] != c2 || v[2] != c3 {
+			t.Fatal()
+		}
+		return nil
+	})
 	// t.Log(r.Response.Header)
 }
 
@@ -553,7 +571,11 @@ func Test_ResBody(t *testing.T) {
 	}); e != nil {
 		t.Fatal()
 	}
-	if !bytes.Equal(r.Respon, []byte("1ab45")) {
-		t.Fatal(r.Respon)
-	}
+
+	r.Respon(func(b []byte) error {
+		if string(b) != "1ab45" {
+			t.Fatal(string(b))
+		}
+		return nil
+	})
 }
