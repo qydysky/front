@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,8 +39,9 @@ type Config struct {
 	lock sync.RWMutex `json:"-"`
 	Addr string       `json:"addr"`
 	TLS  struct {
-		Pub string `json:"pub"`
-		Key string `json:"key"`
+		Pub     string   `json:"pub"`
+		Key     string   `json:"key"`
+		Decrypt []string `json:"decrypt"`
 	} `json:"tls"`
 	RetryBlocks  Blocks               `json:"retryBlocks"`
 	RetryBlocksI pslice.BlocksI[byte] `json:"-"`
@@ -73,10 +75,11 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, shutdown func
 	}
 	if t.TLS.Key != "" && t.TLS.Pub != "" {
 		var (
-			pub    []byte
-			pri    []byte
-			errPub error
-			errPri error
+			pub           []byte
+			pri           []byte
+			errPub        error
+			errPri        error
+			errPriDecrypt error
 		)
 		if !strings.HasPrefix(t.TLS.Pub, "http://") && !strings.HasPrefix(t.TLS.Pub, "https://") {
 			pf := pfile.New(t.TLS.Pub, 0, false)
@@ -104,8 +107,17 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, shutdown func
 			})
 			pri = r.Respon
 		}
-		if errPub != nil || errPri != nil {
-			logger.Error(`E:`, fmt.Sprintf("%v errPub(%v) errPri(%v)", t.Addr, errPub, errPri))
+		if len(pri) > 0 && len(t.TLS.Decrypt) > 0 {
+			var buf = bytes.NewBuffer([]byte{})
+			cmd := exec.CommandContext(ctx, t.TLS.Decrypt[0], t.TLS.Decrypt[1:]...)
+			cmd.Stderr = os.Stdout
+			cmd.Stdout = buf
+			cmd.Stdin = bytes.NewReader(pri)
+			errPriDecrypt = cmd.Run()
+			pri = buf.Bytes()
+		}
+		if errPub != nil || errPri != nil || errPriDecrypt != nil {
+			logger.Error(`E:`, fmt.Sprintf("%v errPub(%v) errPri(%v) errPriDecrypt(%v)", t.Addr, errPub, errPri, errPriDecrypt))
 		} else if cert, e := tls.X509KeyPair(pub, pri); e != nil {
 			logger.Error(`E:`, fmt.Sprintf("%v %v", t.Addr, e))
 		} else {
