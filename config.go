@@ -65,7 +65,7 @@ type Blocks struct {
 	Num  int    `json:"num"`
 }
 
-func (t *Config) Run(ctx context.Context, logger Logger) (e error, shutdown func()) {
+func (t *Config) Run(ctx context.Context, logger Logger) (run func()) {
 
 	ctx, done := pctx.WithWait(ctx, 0, time.Minute)
 
@@ -171,9 +171,9 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, shutdown func
 	}
 
 	t.SwapSign(ctx, logger)
-	shutdownf := t.startServer(ctx, logger, &httpSer)
-	logger.Info(`I:`, fmt.Sprintf("%v running", t.Addr))
-	return nil, func() {
+	return func() {
+		shutdownf := t.startServer(ctx, logger, &httpSer)
+		logger.Info(`I:`, fmt.Sprintf("%v running", t.Addr))
 		<-ctx.Done()
 		shutdownf()
 		logger.Info(`I:`, fmt.Sprintf("%v shutdown", t.Addr))

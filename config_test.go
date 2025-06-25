@@ -87,11 +87,7 @@ func Test_Uri3(t *testing.T) {
 		t.Fatal(e)
 	}
 
-	if e, shutdown := conf.Run(ctx, logger); e != nil {
-		t.Fatal(e)
-	} else {
-		go shutdown()
-	}
+	go conf.Run(ctx, logger)()
 
 	time.Sleep(time.Second)
 
@@ -156,11 +152,7 @@ func Test_Uri2(t *testing.T) {
 		},
 	}
 
-	if e, shutdown := conf.Run(ctx, logger); e != nil {
-		t.Fatal(e)
-	} else {
-		go shutdown()
-	}
+	go conf.Run(ctx, logger)()
 
 	time.Sleep(time.Second)
 
@@ -217,13 +209,7 @@ func Test_Uri(t *testing.T) {
 			},
 		},
 	}
-
-	if e, shutdown := conf.Run(ctx, logger); e != nil {
-		t.Fatal(e)
-	} else {
-		go shutdown()
-	}
-
+	go conf.Run(ctx, logger)()
 	time.Sleep(time.Second)
 
 	r := reqf.New()
@@ -266,11 +252,7 @@ func Test_Back(t *testing.T) {
 		},
 	}
 
-	if e, shutdown := conf.Run(ctx, logger); e != nil {
-		t.Fatal(e)
-	} else {
-		go shutdown()
-	}
+	go conf.Run(ctx, logger)()
 
 	time.Sleep(time.Second)
 
@@ -355,11 +337,7 @@ func Test_Res(t *testing.T) {
 		},
 	}
 
-	if e, shutdown := conf.Run(ctx, logger); e != nil {
-		t.Fatal(e)
-	} else {
-		go shutdown()
-	}
+	go conf.Run(ctx, logger)()
 
 	time.Sleep(time.Second)
 
@@ -426,11 +404,7 @@ func Test_Cookie(t *testing.T) {
 		},
 	}
 
-	if e, shutdown := conf.Run(ctx, logger); e != nil {
-		t.Fatal(e)
-	} else {
-		go shutdown()
-	}
+	go conf.Run(ctx, logger)()
 
 	time.Sleep(time.Second)
 
@@ -494,11 +468,7 @@ func Test_Retry(t *testing.T) {
 		},
 	}
 
-	if e, shutdown := conf.Run(ctx, logger); e != nil {
-		t.Fatal(e)
-	} else {
-		go shutdown()
-	}
+	go conf.Run(ctx, logger)()
 
 	time.Sleep(time.Second)
 
@@ -556,11 +526,7 @@ func Test_ResBody(t *testing.T) {
 		},
 	}
 
-	if e, shutdown := conf.Run(ctx, logger); e != nil {
-		t.Fatal(e)
-	} else {
-		go shutdown()
-	}
+	go conf.Run(ctx, logger)()
 
 	time.Sleep(time.Second)
 

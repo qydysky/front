@@ -259,11 +259,7 @@ func main() {
 		}
 
 		for i := 0; i < len(configS); i++ {
-			if e, shutdown := configS[i].Run(ctx, logger); e != nil {
-				return
-			} else {
-				go shutdown()
-			}
+			go configS[i].Run(ctx, logger)()
 		}
 
 		select {
