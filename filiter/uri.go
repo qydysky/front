@@ -28,7 +28,7 @@ func (t *Uri) Match(r *http.Request) (bool, error) {
 				log.Default().Println(e)
 				return false
 			} else {
-				return exp.MatchString(r.RequestURI)
+				return exp.MatchString(r.Host + r.RequestURI)
 			}
 		}
 	}
