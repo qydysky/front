@@ -79,6 +79,7 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, shutdown func
 			pri           []byte
 			errPub        error
 			errPri        error
+			errPubDecrypt error
 			errPriDecrypt error
 		)
 		if !strings.HasPrefix(t.TLS.Pub, "http://") && !strings.HasPrefix(t.TLS.Pub, "https://") {
@@ -113,6 +114,15 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, shutdown func
 				return nil
 			})
 		}
+		if len(pub) > 0 && len(t.TLS.Decrypt) > 0 {
+			var buf = bytes.NewBuffer([]byte{})
+			cmd := exec.CommandContext(ctx, t.TLS.Decrypt[0], t.TLS.Decrypt[1:]...)
+			cmd.Stderr = os.Stdout
+			cmd.Stdout = buf
+			cmd.Stdin = bytes.NewReader(pub)
+			errPubDecrypt = cmd.Run()
+			pub = buf.Bytes()
+		}
 		if len(pri) > 0 && len(t.TLS.Decrypt) > 0 {
 			var buf = bytes.NewBuffer([]byte{})
 			cmd := exec.CommandContext(ctx, t.TLS.Decrypt[0], t.TLS.Decrypt[1:]...)
@@ -122,8 +132,8 @@ func (t *Config) Run(ctx context.Context, logger Logger) (e error, shutdown func
 			errPriDecrypt = cmd.Run()
 			pri = buf.Bytes()
 		}
-		if errPub != nil || errPri != nil || errPriDecrypt != nil {
-			logger.Error(`E:`, fmt.Sprintf("%v errPub(%v) errPri(%v) errPriDecrypt(%v)", t.Addr, errPub, errPri, errPriDecrypt))
+		if errPub != nil || errPri != nil || errPubDecrypt != nil || errPriDecrypt != nil {
+			logger.Error(`E:`, fmt.Sprintf("%v errPub(%v) errPri(%v) errPubDecrypt(%v) errPriDecrypt(%v)", t.Addr, errPub, errPri, errPubDecrypt, errPriDecrypt))
 		} else if cert, e := tls.X509KeyPair(pub, pri); e != nil {
 			logger.Error(`E:`, fmt.Sprintf("%v %v", t.Addr, e))
 		} else {

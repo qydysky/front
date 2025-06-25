@@ -113,7 +113,7 @@ config:
 - *tls*: {} 启用tls, 默认空
     - *pub*: string 公钥pem路径，支持从`http`/`https`获取
     - *key*: string 私钥pem路径，支持从`http`/`https`获取
-    - *decrypt*: []string cmd解密key，私钥会通过stdin输入，并使用stdout输出作为私钥pem，为空时不执行
+    - *decrypt*: []string cmd解密key，公/私钥会通过stdin输入，并使用stdout输出作为实际使用公/私钥，为空时不执行
 - routes: [] 路由
     - path: []string 路径
     - rollRule: string 可选
