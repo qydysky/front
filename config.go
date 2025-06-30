@@ -601,7 +601,7 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var passFiliter *unique.Handle[string]
 	for i := range t.Backs {
 
-		var noPassFiliter bool
+		var noPassFiliter bool = passFiliter != nil
 		for filiter := range t.Backs[i].getFiliters() {
 			noPassFiliter = true
 			if passFiliter != nil && filiter.Id() != passFiliter {
@@ -704,11 +704,11 @@ func (t *Back) getVerifyPeerCer() (cer []byte, e error) {
 }
 func (t *Back) getFiliters() (f iter.Seq[*filiter.Filiter]) {
 	return func(yield func(*filiter.Filiter) bool) {
-		for i := 0; i < len(t.route.Filiters); i++ {
-			if !yield(t.route.Filiters[i]) {
-				return
-			}
-		}
+		// for i := 0; i < len(t.route.Filiters); i++ {
+		// 	if !yield(t.route.Filiters[i]) {
+		// 		return
+		// 	}
+		// }
 		for i := 0; i < len(t.Filiters); i++ {
 			if !yield(t.Filiters[i]) {
 				return
