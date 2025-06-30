@@ -8,16 +8,16 @@ import (
 	boolS "github.com/qydysky/part/bools"
 )
 
-type Uri struct {
+type Host struct {
 	AccessRule string            `json:"accessRule"`
 	Items      map[string]string `json:"items"`
 }
 
-func (t *Uri) Valid() bool {
+func (t *Host) Valid() bool {
 	return t.AccessRule != "" && len(t.Items) != 0
 }
 
-func (t *Uri) Match(r *http.Request) (bool, error) {
+func (t *Host) Match(r *http.Request) (bool, error) {
 	if !t.Valid() {
 		return true, nil
 	}
@@ -28,7 +28,7 @@ func (t *Uri) Match(r *http.Request) (bool, error) {
 				log.Default().Println(e)
 				return false
 			} else {
-				return exp.MatchString(r.RequestURI)
+				return exp.MatchString(r.Host)
 			}
 		}
 	}

@@ -241,6 +241,13 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 		var noPassFiliter bool
 		for filiter := range route.getFiliters() {
 			noPassFiliter = true
+			if ok, e := filiter.ReqHost.Match(r); e != nil {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+			} else if !ok {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrPatherCheckFail))
+				continue
+			}
+
 			if ok, e := filiter.ReqUri.Match(r); e != nil {
 				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 			} else if !ok {
@@ -283,6 +290,10 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 					var noPassFiliter bool
 					for filiter := range backP.(*Back).getFiliters() {
 						noPassFiliter = true
+						if ok, e := filiter.ReqHost.Match(r); !ok || e != nil {
+							logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
+							continue
+						}
 						if ok, e := filiter.ReqUri.Match(r); !ok || e != nil {
 							logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 							continue
@@ -605,6 +616,9 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 		for filiter := range t.Backs[i].getFiliters() {
 			noPassFiliter = true
 			if passFiliter != nil && filiter.Id() != passFiliter {
+				continue
+			}
+			if ok, e := filiter.ReqHost.Match(r); !ok || e != nil {
 				continue
 			}
 			if ok, e := filiter.ReqUri.Match(r); !ok || e != nil {

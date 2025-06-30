@@ -145,10 +145,14 @@ setting: setting代指下述各配置
 
 - filiters: []
     
-    当同一个route的back的filiter(reqUri、reqHeader)不同时，将会从上至下匹配back，直到首个有效的filiter，并继续匹配并附加同filiter的back
+    当同一个route的back的filiter(reqHost、reqUri、reqHeader)不同时，将会从上至下匹配back，直到首个有效的filiter，并继续匹配并附加同filiter的back
 
     filiters中同个{}为和关系，不同{}为或关系
 
+    - reqHost:{} 请求后端前，请求Host过滤器
+        - accessRule:string 布尔表达式，为true时才通过,例`{id}|(!{id2}&{id3})`
+        - items: map[string]string
+            - id: matchExp
     - reqUri:{} 请求后端前，请求路径过滤器
         - accessRule:string 布尔表达式，为true时才通过,例`{id}|(!{id2}&{id3})`
         - items: map[string]string
