@@ -9,6 +9,7 @@ import (
 	"time"
 	_ "unsafe"
 
+	"github.com/qydysky/front/utils"
 	component2 "github.com/qydysky/part/component2"
 	pfile "github.com/qydysky/part/file"
 	pslice "github.com/qydysky/part/slice"
@@ -45,14 +46,29 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 		return MarkRetry(os.ErrNotExist)
 	}
 
+	logger.Debug(`T:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT)))
+
+	if chosenBack.getSplicing() != 0 {
+		cookie := &http.Cookie{
+			Name:   cookie,
+			Value:  chosenBack.Id(),
+			MaxAge: chosenBack.getSplicing(),
+			Path:   routePath,
+		}
+		if utils.ValidCookieDomain(r.Host) {
+			cookie.Domain = r.Host
+		}
+		w.Header().Add("Set-Cookie", (cookie).String())
+	}
+
+	w.Header().Add(header+"Info", chosenBack.Name)
+
 	// if e :=
 	copyHeader(http.Header{}, w.Header(), chosenBack.getDealerResHeader())
 	// ; e != nil {
 	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
 	// 	return ErrDealResHeader
 	// }
-
-	logger.Debug(`T:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT)))
 
 	http.ServeFile(w, r.WithContext(ctx), path)
 	return nil
