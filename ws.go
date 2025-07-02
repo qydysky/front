@@ -117,7 +117,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 
 	if chosenBack.getSplicing() != 0 {
 		cookie := &http.Cookie{
-			Name:   "_psign_" + cookie,
+			Name:   cookie,
 			Value:  chosenBack.Id(),
 			MaxAge: chosenBack.getSplicing(),
 			Path:   routePath,

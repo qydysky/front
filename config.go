@@ -285,7 +285,7 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 		)
 
 		{
-			if t, e := r.Cookie("_psign_" + cookie); e == nil {
+			if t, e := r.Cookie(cookie); e == nil {
 				if backP, aok := route.backMap.Load(t.Value); aok {
 					var noPassFiliter bool
 					for filiter := range backP.(*Back).getFiliters() {

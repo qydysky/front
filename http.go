@@ -154,7 +154,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	if chosenBack.getSplicing() != 0 {
 		cookie := &http.Cookie{
-			Name:   "_psign_" + cookie,
+			Name:   cookie,
 			Value:  chosenBack.Id(),
 			MaxAge: chosenBack.getSplicing(),
 			Path:   routePath,
@@ -165,7 +165,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		w.Header().Add("Set-Cookie", (cookie).String())
 	}
 
-	w.Header().Add(header+"Info", cookie+";"+chosenBack.Name)
+	w.Header().Add(header+"Info", chosenBack.Name)
 
 	// if e :=
 	copyHeader(resp.Header, w.Header(), chosenBack.getDealerResHeader())
