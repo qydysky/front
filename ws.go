@@ -120,7 +120,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 			Name:   "_psign_" + cookie,
 			Value:  chosenBack.Id(),
 			MaxAge: chosenBack.getSplicing(),
-			Path:   "/",
+			Path:   routePath,
 		}
 		if utils.ValidCookieDomain(r.Host) {
 			cookie.Domain = r.Host
