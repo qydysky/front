@@ -171,7 +171,7 @@ func copyHeader(s, t http.Header, app []dealer.HeaderDealer) {
 }
 
 var header = "X-Front-"
-var cookie = "X-Front-Back"
+var cookie = fmt.Sprintf("_psign_%p_%s", &struct{}{}, time.Now().Format("20060102150405"))
 var (
 	ErrRedirect          = errors.New("ErrRedirect")
 	ErrNoHttp            = errors.New("ErrNoHttp")
