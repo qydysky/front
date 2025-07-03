@@ -5,4 +5,5 @@ type Dealer struct {
 	ReqHeader []HeaderDealer `json:"reqHeader"`
 	ResHeader []HeaderDealer `json:"resHeader"`
 	ResBody   []Body         `json:"resBody"`
+	ResStatus StatusDealer   `json:"resStatus"`
 }
