@@ -400,7 +400,9 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 				}
 			}
 
-			if !strings.Contains(backP.To, "://") {
+			if backP.To == "" {
+				e = component2.Get[reqDealer]("echo").Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.BlocksI)
+			} else if !strings.Contains(backP.To, "://") {
 				e = component2.Get[reqDealer]("local").Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.BlocksI)
 			} else if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
 				e = component2.Get[reqDealer]("ws").Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.BlocksI)
@@ -757,17 +759,78 @@ func (t *Back) getFiliters() (f iter.Seq[*filiter.Filiter]) {
 //			return &t.Filiter.ReqBody
 //		}
 //	}
-func (t *Back) getDealerReqUri() []dealer.UriDealer {
-	return append(t.route.Dealer.ReqUri, t.Dealer.ReqUri...)
+func (t *Back) getDealerReqUri() iter.Seq[dealer.UriDealer] {
+	return func(yield func(dealer.UriDealer) bool) {
+		for i := 0; i < len(t.Dealer.ReqUri); i++ {
+			if !yield(t.Dealer.ReqUri[i]) {
+				return
+			}
+		}
+		for i := 0; i < len(t.route.Dealer.ReqUri); i++ {
+			if !yield(t.route.Dealer.ReqUri[i]) {
+				return
+			}
+		}
+	}
 }
-func (t *Back) getDealerReqHeader() []dealer.HeaderDealer {
-	return append(t.route.Dealer.ReqHeader, t.Dealer.ReqHeader...)
+func (t *Back) getDealerReqHeader() iter.Seq[dealer.HeaderDealer] {
+	return func(yield func(dealer.HeaderDealer) bool) {
+		for i := 0; i < len(t.Dealer.ReqHeader); i++ {
+			if !yield(t.Dealer.ReqHeader[i]) {
+				return
+			}
+		}
+		for i := 0; i < len(t.route.Dealer.ReqHeader); i++ {
+			if !yield(t.route.Dealer.ReqHeader[i]) {
+				return
+			}
+		}
+	}
 }
-func (t *Back) getDealerResHeader() []dealer.HeaderDealer {
-	return append(t.route.Dealer.ResHeader, t.Dealer.ResHeader...)
+func (t *Back) getDealerResHeader() iter.Seq[dealer.HeaderDealer] {
+	return func(yield func(dealer.HeaderDealer) bool) {
+		for i := 0; i < len(t.Dealer.ResHeader); i++ {
+			if !yield(t.Dealer.ResHeader[i]) {
+				return
+			}
+		}
+		for i := 0; i < len(t.route.Dealer.ResHeader); i++ {
+			if !yield(t.route.Dealer.ResHeader[i]) {
+				return
+			}
+		}
+	}
 }
-func (t *Back) getDealerResBody() []dealer.Body {
-	return append(t.route.Dealer.ResBody, t.Dealer.ResBody...)
+func (t *Back) getDealerResBody() iter.Seq[dealer.Body] {
+	return func(yield func(dealer.Body) bool) {
+		for i := 0; i < len(t.Dealer.ResBody); i++ {
+			if !yield(t.Dealer.ResBody[i]) {
+				return
+			}
+		}
+		for i := 0; i < len(t.route.Dealer.ResBody); i++ {
+			if !yield(t.route.Dealer.ResBody[i]) {
+				return
+			}
+		}
+	}
+}
+func (t *Back) getDealerResStatus(yieldNoBreak ...func()) iter.Seq[dealer.StatusDealer] {
+	return func(yield func(dealer.StatusDealer) bool) {
+		if t.Dealer.ResStatus.Valid() {
+			if !yield(t.Dealer.ResStatus) {
+				return
+			}
+		}
+		if t.route.Dealer.ResStatus.Valid() {
+			if !yield(t.route.Dealer.ResStatus) {
+				return
+			}
+		}
+		for _, v := range yieldNoBreak {
+			v()
+		}
+	}
 }
 
 func (t *Back) Id() string {

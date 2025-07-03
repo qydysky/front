@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	netUrl "net/url"
+	"regexp"
 	"strings"
 	"time"
 	_ "unsafe"
@@ -167,14 +168,14 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	w.Header().Add(header+"Info", chosenBack.Name)
 
-	// if e :=
 	copyHeader(resp.Header, w.Header(), chosenBack.getDealerResHeader())
-	// ; e != nil {
-	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
-	// 	return ErrDealResHeader
-	// }
 
-	w.WriteHeader(resp.StatusCode)
+	for v := range chosenBack.getDealerResStatus(func() { w.WriteHeader(resp.StatusCode) }) {
+		if regexp.MustCompile(v.MatchExp).MatchString(resp.Status) {
+			w.WriteHeader(v.Value)
+			break
+		}
+	}
 
 	if resp.StatusCode < 200 ||
 		resp.StatusCode == http.StatusNoContent ||
@@ -191,7 +192,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		defer put()
 
 		var dealers []func(data []byte) (dealed []byte, stop bool)
-		for _, v := range chosenBack.getDealerResBody() {
+		for v := range chosenBack.getDealerResBody() {
 			switch v.Action {
 			case `replace`:
 				dealers = append(dealers, v.GetReplaceDealer())

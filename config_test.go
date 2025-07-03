@@ -26,6 +26,124 @@ var logger = plog.New(plog.Config{
 	},
 })
 
+func Test_Uri5(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	j := []byte(`
+	{
+		"addr": "127.0.0.1:19000",
+		"routes": [
+			{
+				"path": ["/test/"],
+				"pathAdd": true,
+				"backs": [
+					{
+						"name": "1",
+						"dealer": {
+							"resStatus": {
+								"value": 301
+							}
+						}
+					}
+				]
+			}
+		]
+	}
+	`)
+
+	conf := &Config{}
+	if e := json.Unmarshal(j, conf); e != nil {
+		t.Fatal(e)
+	}
+
+	go conf.Run(ctx, logger)()
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	r.Reqf(reqf.Rval{
+		Ctx: ctx,
+		Url: "http://127.0.0.1:19000/test/1",
+	})
+
+	r.Response(func(r *http.Response) error {
+		if r.StatusCode != 301 {
+			t.Fatal()
+		}
+		return nil
+	})
+}
+
+func Test_Uri4(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	web := pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	})
+	web.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/test/1`: func(w http.ResponseWriter, r *http.Request) {
+			io.Copy(w, r.Body)
+		},
+	})
+
+	defer web.Shutdown()
+
+	time.Sleep(time.Second)
+
+	j := []byte(`
+	{
+		"addr": "127.0.0.1:19000",
+		"routes": [
+			{
+				"path": ["/test/"],
+				"pathAdd": true,
+				"backs": [
+					{
+						"name": "1",
+						"to": "://127.0.0.1:19001",
+						"filiters": [
+							{
+								"reqHost": {
+									"accessRule": "{f}",
+									"items": {
+										"f": "127\\.0\\.0\\.1"
+									}
+								}
+							}
+						]
+					}
+				]
+			}
+		]
+	}
+	`)
+
+	conf := &Config{}
+	if e := json.Unmarshal(j, conf); e != nil {
+		t.Fatal(e)
+	}
+
+	go conf.Run(ctx, logger)()
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	r.Reqf(reqf.Rval{
+		Ctx:     ctx,
+		Url:     "http://127.0.0.1:19000/test/1",
+		PostStr: "123",
+	})
+
+	r.Respon(func(b []byte) error {
+		if string(b) != "123" {
+			t.Fatal(string(b))
+		}
+		return nil
+	})
+}
+
 func Test_Uri3(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -57,7 +175,7 @@ func Test_Uri3(t *testing.T) {
 					{
 						"name": "1",
 						"to": "://127.0.0.1:19001",
-						"filiter": [
+						"filiters": [
 							{
 								"reqUri": {
 									"accessRule": "{f}",

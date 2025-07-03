@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"net/http"
 	"regexp"
 	"strings"
@@ -119,9 +120,9 @@ func loadConfig(ctx context.Context, buf []byte, configS *[]Config, logger Logge
 	return
 }
 
-func dealUri(s string, app []dealer.UriDealer) (t string) {
+func dealUri(s string, app iter.Seq[dealer.UriDealer]) (t string) {
 	t = s
-	for _, v := range app {
+	for v := range app {
 		switch v.Action {
 		case `replace`:
 			t = regexp.MustCompile(v.MatchExp).ReplaceAllString(t, v.Value)
@@ -131,7 +132,7 @@ func dealUri(s string, app []dealer.UriDealer) (t string) {
 	return
 }
 
-func copyHeader(s, t http.Header, app []dealer.HeaderDealer) {
+func copyHeader(s, t http.Header, app iter.Seq[dealer.HeaderDealer]) {
 	sm := (map[string][]string)(s)
 	tm := (map[string][]string)(t)
 	for k, v := range sm {
@@ -153,7 +154,7 @@ func copyHeader(s, t http.Header, app []dealer.HeaderDealer) {
 		}
 	}
 
-	for _, v := range app {
+	for v := range app {
 		switch v.Action {
 		case `replace`:
 			if va := t.Get(v.Key); va != "" {

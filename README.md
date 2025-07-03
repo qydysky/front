@@ -127,8 +127,9 @@ config:
     - backs: [] 后端
         - name: string 后端名称，将在日志中显示
         - to: string 后端地址，说明如下：
+            - 为空时，将会默认返回200
             - 含有`://`时，例`s://www.baidu.com`，会根据客户端自动添加http or ws在地址前
-            - 不含`://`时，将会尝试解析成本地文件
+            - 不含`://`时，将会尝试解析成本地文件，当指向zip文件，将尝试读取
         - weight: string uint 权重，按routes中的全部back的权重比分配，当权重为0时，将停止新请求的进入
         - alwaysUp: bool 总是在线， 当只有一个后端时，默认为true
         - setting...
@@ -193,4 +194,7 @@ setting: setting代指下述各配置
         - action: string 可选`replace`。
         - matchExp: string `replace`时结合value进行替换
         - value: string `replace`时结合matchExp进行替换。
+    - resStatus:{} 返回后端响应前，修改响应码(仅to为空、http、https时有效)
+        - matchExp: string 正则表达式
+        - value: int
 
