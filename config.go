@@ -291,21 +291,18 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 					for filiter := range backP.(*Back).getFiliters() {
 						noPassFiliter = true
 						if ok, e := filiter.ReqHost.Match(r); !ok || e != nil {
-							logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 							continue
 						}
 						if ok, e := filiter.ReqUri.Match(r); !ok || e != nil {
-							logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 							continue
 						}
 						if ok, e := filiter.ReqHeader.Match(r.Header); !ok || e != nil {
-							logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
 							continue
 						}
 						noPassFiliter = false
 						break
 					}
-					if noPassFiliter {
+					if !noPassFiliter {
 						backIs = addIfNotExsit(backIs, backEqual, backP.(*Back))
 					}
 				}
