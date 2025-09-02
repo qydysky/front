@@ -23,11 +23,11 @@ Usage of ./main:
   -c string
         config (default "main.json")
   -decrypt string
-        decrypt
+        decrypt with pri.pem
   -encrypt string
-        encrypt
+        encrypt with pub.pem
   -genKey
-        genKey
+        gen new pub.pem and pri.pem
   -logFile string
         logFile, defalut no log file
   -noAutoReload
@@ -198,3 +198,5 @@ setting: setting代指下述各配置
         - matchExp: string 正则表达式
         - value: int
 
+可以使用的环境变量(仅能单独使用)：
+- `$remote_addr`:当存在`X-Real-IP`头时，取其值，否则取远程地址。在`dealer.reqHeader.value`、`dealer.resHeader.value`可用

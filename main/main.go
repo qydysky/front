@@ -41,9 +41,9 @@ func main() {
 		noLog        = flag.Bool("noLog", false, "noLog")
 		noDebugLog   = flag.Bool("noDebugLog", false, "noDebugLog")
 		noAutoReload = flag.Bool("noAutoReload", false, "noAutoReload")
-		genKey       = flag.Bool("genKey", false, "genKey")
-		decrypt      = flag.String("decrypt", "", "decrypt")
-		encrypt      = flag.String("encrypt", "", "encrypt")
+		genKey       = flag.Bool("genKey", false, "gen new pub.pem and pri.pem")
+		decrypt      = flag.String("decrypt", "", "decrypt with pri.pem")
+		encrypt      = flag.String("encrypt", "", "encrypt with pub.pem")
 	)
 	flag.Parse()
 
@@ -51,11 +51,10 @@ func main() {
 		if pri, pub, e := pca.MlkemF.NewKey(); e != nil {
 			panic(e)
 		} else {
-			fmt.Println("公钥(用于-encrypt)：")
+			fmt.Println("pub.pem(for -encrypt):")
 			fmt.Println(string(pem.EncodeToMemory(pub)))
-			fmt.Println("私钥(用于-decrypt)：")
+			fmt.Println("pri.pem(for -decrypt)")
 			fmt.Println(string(pem.EncodeToMemory(pri)))
-			fmt.Println("请复制以上公私钥并另存为文件")
 			os.Exit(0)
 		}
 	}
