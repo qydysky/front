@@ -199,4 +199,4 @@ setting: setting代指下述各配置
         - value: int
 
 可以使用的环境变量(仅能单独使用)：
-- `$remote_addr`:当存在`X-Real-IP`头时，取其值，否则取远程地址。在`dealer.reqHeader.value`、`dealer.resHeader.value`可用
+- `$remote_addr`:当存在`X-Real-IP`头时，取其值，否则取请求端的远程地址。在`dealer.reqHeader.value`、`dealer.resHeader.value`可用
