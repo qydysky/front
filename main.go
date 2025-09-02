@@ -172,9 +172,9 @@ func copyHeader(env map[string]string, s, t http.Header, app iter.Seq[dealer.Hea
 }
 
 func getEnv(m map[string]string, val string) string {
-	if len(val)== 0 || val[0] != '$' {
+	if len(val) == 0 || val[0] != '$' {
 		return val
-	} else if v,ok := m[val]; ok {
+	} else if v, ok := m[val]; ok {
 		return v
 	} else {
 		return val
@@ -182,9 +182,13 @@ func getEnv(m map[string]string, val string) string {
 }
 
 func setEnvIfNot(m map[string]string, key, val string) {
-	if _,ok := m[key]; ok {
+	if _, ok := m[key]; !ok {
 		m[key] = val
 	}
+}
+
+func setEnv(m map[string]string, key, val string) {
+	m[key] = val
 }
 
 // var header = "X-Front-"
