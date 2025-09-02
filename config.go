@@ -233,7 +233,7 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 
 		if len(r.RequestURI) > 8000 {
 			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrUriTooLong))
-			w.Header().Add(header+"Error", ErrUriTooLong.Error())
+			// w.Header().Add(header+"Error", ErrUriTooLong.Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -272,7 +272,7 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 			break
 		}
 		if noPassFiliter {
-			w.Header().Add(header+"Error", ErrCheckFail.Error())
+			// w.Header().Add(header+"Error", ErrCheckFail.Error())
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
@@ -321,7 +321,7 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 
 		if len(backIs) == 0 {
 			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "BLOCK", ErrNoRoute))
-			w.Header().Add(header+"Error", ErrNoRoute.Error())
+			// w.Header().Add(header+"Error", ErrNoRoute.Error())
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -357,7 +357,7 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 							if e != nil {
 								if !errors.Is(e, io.EOF) {
 									logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, route.config.Addr, routePath, "Err", e))
-									w.Header().Add(header+"Error", ErrNoRoute.Error())
+									// w.Header().Add(header+"Error", ErrNoRoute.Error())
 									w.WriteHeader(http.StatusBadRequest)
 									return
 								}
@@ -432,7 +432,7 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 		}
 
 		if e != nil {
-			w.Header().Add(header+"Error", e.Error())
+			// w.Header().Add(header+"Error", e.Error())
 			if errors.Is(e, ErrHeaderCheckFail) || errors.Is(e, ErrBodyCheckFail) {
 				w.WriteHeader(http.StatusForbidden)
 			} else {

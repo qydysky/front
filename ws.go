@@ -104,7 +104,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		break
 	}
 	if noPassFiliter {
-		w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
+		// w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
 		return MarkRetry(ErrHeaderCheckFail)
 	}
 
@@ -128,7 +128,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		w.Header().Set("Set-Cookie", (cookie).String())
 	}
 
-	w.Header().Set(header+"Info", cookie+";"+chosenBack.Name)
+	// w.Header().Set(header+"Info", cookie+";"+chosenBack.Name)
 
 	defer conn.Close()
 

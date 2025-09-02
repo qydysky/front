@@ -61,7 +61,7 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 		w.Header().Add("Set-Cookie", (cookie).String())
 	}
 
-	w.Header().Add(header+"Info", chosenBack.Name)
+	// w.Header().Add(header+"Info", chosenBack.Name)
 
 	// if e :=
 	copyHeader(http.Header{}, w.Header(), chosenBack.getDealerResHeader())
