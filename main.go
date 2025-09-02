@@ -182,7 +182,7 @@ func getEnv(m map[string]string, val string) string {
 }
 
 func setEnvIfNot(m map[string]string, key, val string) {
-	if _, ok := m[key]; !ok {
+	if v, ok := m[key]; !ok || v == "" {
 		m[key] = val
 	}
 }
