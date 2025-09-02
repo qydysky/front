@@ -132,7 +132,7 @@ func dealUri(s string, app iter.Seq[dealer.UriDealer]) (t string) {
 	return
 }
 
-func copyHeader(s, t http.Header, app iter.Seq[dealer.HeaderDealer]) {
+func copyHeader(env map[string]string, s, t http.Header, app iter.Seq[dealer.HeaderDealer]) {
 	sm := (map[string][]string)(s)
 	tm := (map[string][]string)(t)
 	for k, v := range sm {
@@ -158,16 +158,32 @@ func copyHeader(s, t http.Header, app iter.Seq[dealer.HeaderDealer]) {
 		switch v.Action {
 		case `replace`:
 			if va := t.Get(v.Key); va != "" {
-				t.Set(v.Key, regexp.MustCompile(v.MatchExp).ReplaceAllString(va, v.Value))
+				t.Set(v.Key, regexp.MustCompile(v.MatchExp).ReplaceAllString(va, getEnv(env, v.Value)))
 			}
 		case `set`:
-			t.Set(v.Key, v.Value)
+			t.Set(v.Key, getEnv(env, v.Value))
 		case `add`:
-			t.Add(v.Key, v.Value)
+			t.Add(v.Key, getEnv(env, v.Value))
 		case `del`:
 			t.Del(v.Key)
 		default:
 		}
+	}
+}
+
+func getEnv(m map[string]string, val string) string {
+	if len(val)== 0 || val[0] != '$' {
+		return val
+	} else if v,ok := m[val]; ok {
+		return v
+	} else {
+		return val
+	}
+}
+
+func setEnvIfNot(m map[string]string, key, val string) {
+	if _,ok := m[key]; ok {
+		m[key] = val
 	}
 }
 

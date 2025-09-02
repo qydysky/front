@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 	_ "unsafe"
 
@@ -28,6 +29,7 @@ type localDealer struct{}
 
 func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	var (
+		env       = make(map[string]string)
 		opT       = time.Now()
 		logFormat = "%v %v %v%v > %v local %v %v %v"
 	)
@@ -63,8 +65,11 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 
 	// w.Header().Add(header+"Info", chosenBack.Name)
 
+	setEnvIfNot(env, `$remote_addr`, r.Header.Get("X-Real-IP"))
+	setEnvIfNot(env, `$remote_addr`, strings.Split(r.RemoteAddr, ":")[0])
+
 	// if e :=
-	copyHeader(http.Header{}, w.Header(), chosenBack.getDealerResHeader())
+	copyHeader(env, http.Header{}, w.Header(), chosenBack.getDealerResHeader())
 	// ; e != nil {
 	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
 	// 	return ErrDealResHeader

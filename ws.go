@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
+	"strings"
 	"time"
 	_ "unsafe"
 
@@ -38,6 +39,7 @@ type wsDealer struct{}
 
 func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	var (
+		env       = make(map[string]string)
 		opT       = time.Now()
 		resp      *http.Response
 		conn      net.Conn
@@ -61,8 +63,11 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 
 	reqHeader := make(http.Header)
 
+	setEnvIfNot(env, `$remote_addr`, r.Header.Get("X-Real-IP"))
+	setEnvIfNot(env, `$remote_addr`, strings.Split(r.RemoteAddr, ":")[0])
+
 	// if e :=
-	copyHeader(r.Header, reqHeader, chosenBack.getDealerReqHeader())
+	copyHeader(env, r.Header, reqHeader, chosenBack.getDealerReqHeader())
 	// ; e != nil {
 	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 	// 	return ErrDealReqHeader
@@ -134,7 +139,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 
 	resHeader := make(http.Header)
 	// if e :=
-	copyHeader(resp.Header, resHeader, chosenBack.getDealerResHeader())
+	copyHeader(env, resp.Header, resHeader, chosenBack.getDealerResHeader())
 	// ; e != nil {
 	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 	// 	return ErrDealResHeader

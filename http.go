@@ -38,6 +38,7 @@ type httpDealer struct{}
 
 func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	var (
+		env       = make(map[string]string)
 		opT       = time.Now()
 		resp      *http.Response
 		logFormat = "%v %v %v%v > %v http %v %v %v"
@@ -59,8 +60,11 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		return MarkRetry(ErrReqCreFail)
 	}
 
+	setEnvIfNot(env, `$remote_addr`, r.Header.Get("X-Real-IP"))
+	setEnvIfNot(env, `$remote_addr`, strings.Split(r.RemoteAddr, ":")[0])
+
 	// if e :=
-	copyHeader(r.Header, req.Header, chosenBack.getDealerReqHeader())
+	copyHeader(env, r.Header, req.Header, chosenBack.getDealerReqHeader())
 	// ; e != nil {
 	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
 	// 	return ErrDealReqHeader
@@ -168,7 +172,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	// w.Header().Add(header+"Info", chosenBack.Name)
 
-	copyHeader(resp.Header, w.Header(), chosenBack.getDealerResHeader())
+	copyHeader(env, resp.Header, w.Header(), chosenBack.getDealerResHeader())
 
 	for v := range chosenBack.getDealerResStatus(func() { w.WriteHeader(resp.StatusCode) }) {
 		if regexp.MustCompile(v.MatchExp).MatchString(resp.Status) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 	_ "unsafe"
 
@@ -25,6 +26,7 @@ type echoDealer struct{}
 
 func (echoDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	var (
+		env       = make(map[string]string)
 		opT       = time.Now()
 		logFormat = "%v %v %v%v > %v echo %v %v %v"
 	)
@@ -46,7 +48,10 @@ func (echoDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	// w.Header().Add(header+"Info", chosenBack.Name)
 
-	copyHeader(http.Header{}, w.Header(), chosenBack.getDealerResHeader())
+	setEnvIfNot(env, `$remote_addr`, r.Header.Get("X-Real-IP"))
+	setEnvIfNot(env, `$remote_addr`, strings.Split(r.RemoteAddr, ":")[0])
+	
+	copyHeader(env, http.Header{}, w.Header(), chosenBack.getDealerResHeader())
 
 	for v := range chosenBack.getDealerResStatus(func() { w.WriteHeader(http.StatusOK) }) {
 		w.WriteHeader(v.Value)

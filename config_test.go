@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +26,26 @@ var logger = plog.New(plog.Config{
 		`E:`: plog.On,
 	},
 })
+
+func Test5(t *testing.T) {
+	t.Log(strings.Split("127.0.0.1:9090", ":")[0])
+}
+
+func Benchmark1(b *testing.B) {
+	// m := make(map[string]string)
+	// m["123"] = "133"
+
+	f := func(m map[string]string) bool {
+		_, ok := m["123"]
+		return ok
+	}
+
+	for b.Loop() {
+		var m = make(map[string]string)
+		m["123"] = "133"
+		f(m)
+	}
+}
 
 func Test_Uri5(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
