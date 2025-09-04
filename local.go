@@ -46,10 +46,10 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 		}
 	}
 
-	path = filepath.Clean(path)
+	path = filepath.Clean(dealUri(path, chosenBack.getDealerReqUri()))
 
 	if !pfile.New(path, 0, true).IsExist() {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", errors.New("ErrNotExist "+path), time.Since(opT)))
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", errors.New("NotExist "+path), time.Since(opT)))
 		return MarkRetry(os.ErrNotExist)
 	}
 
