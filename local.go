@@ -12,11 +12,9 @@ import (
 	"time"
 	_ "unsafe"
 
-	"github.com/dustin/go-humanize"
 	"github.com/qydysky/front/utils"
 	component2 "github.com/qydysky/part/component2"
 	pfile "github.com/qydysky/part/file"
-	part "github.com/qydysky/part/io"
 	pslice "github.com/qydysky/part/slice"
 )
 
@@ -82,19 +80,6 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 	// 	return ErrDealResHeader
 	// }
 
-	if pfile.New(path, 0, true).IsDir() {
-		http.ServeFile(w, r.WithContext(ctx), path)
-	} else {
-		var offsetByte uint64
-		var maxByte uint64
-		if r.URL.Query().Has("offsetByte") {
-			offsetByte, _ = humanize.ParseBytes(r.URL.Query().Get("offsetByte"))
-		}
-		if r.URL.Query().Has("maxByte") {
-			maxByte, _ = humanize.ParseBytes(r.URL.Query().Get("maxByte"))
-		}
-		f := pfile.New(path, int64(offsetByte), true)
-		f.CopyToIoWriter(w, part.CopyConfig{MaxByte: maxByte})
-	}
+	http.ServeFile(w, r.WithContext(ctx), path)
 	return nil
 }
