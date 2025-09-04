@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	_ "unsafe"
@@ -44,6 +45,8 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 			path += s
 		}
 	}
+
+	path = filepath.Clean(path)
 
 	if !pfile.New(path, 0, true).IsExist() {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", errors.New("ErrNotExist "+path), time.Since(opT)))
