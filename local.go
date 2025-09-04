@@ -12,9 +12,11 @@ import (
 	"time"
 	_ "unsafe"
 
+	"github.com/dustin/go-humanize"
 	"github.com/qydysky/front/utils"
 	component2 "github.com/qydysky/part/component2"
 	pfile "github.com/qydysky/part/file"
+	part "github.com/qydysky/part/io"
 	pslice "github.com/qydysky/part/slice"
 )
 
@@ -80,6 +82,16 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 	// 	return ErrDealResHeader
 	// }
 
-	http.ServeFile(w, r.WithContext(ctx), path)
+	if dir, file := filepath.Split(path); file == "" {
+		http.ServeFile(w, r.WithContext(ctx), dir)
+	} else {
+		var offsetIndex uint64
+		if r.URL.Query().Has("offset") {
+			offset := r.URL.Query().Get("offset")
+			offsetIndex, _ = humanize.ParseBytes(offset)
+		}
+		f := pfile.New(path, int64(offsetIndex), true)
+		f.CopyToIoWriter(w, part.CopyConfig{})
+	}
 	return nil
 }
