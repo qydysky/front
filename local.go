@@ -82,7 +82,7 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 	// 	return ErrDealResHeader
 	// }
 
-	if _, file := filepath.Split(path); file == "" {
+	if pfile.New(path, 0, true).IsDir() {
 		http.ServeFile(w, r.WithContext(ctx), path)
 	} else {
 		var offsetByte uint64
