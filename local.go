@@ -82,16 +82,19 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 	// 	return ErrDealResHeader
 	// }
 
-	if dir, file := filepath.Split(path); file == "" {
-		http.ServeFile(w, r.WithContext(ctx), dir)
+	if _, file := filepath.Split(path); file == "" {
+		http.ServeFile(w, r.WithContext(ctx), path)
 	} else {
-		var offsetIndex uint64
-		if r.URL.Query().Has("offset") {
-			offset := r.URL.Query().Get("offset")
-			offsetIndex, _ = humanize.ParseBytes(offset)
+		var offsetByte uint64
+		var maxByte uint64
+		if r.URL.Query().Has("offsetByte") {
+			offsetByte, _ = humanize.ParseBytes(r.URL.Query().Get("offsetByte"))
 		}
-		f := pfile.New(path, int64(offsetIndex), true)
-		f.CopyToIoWriter(w, part.CopyConfig{})
+		if r.URL.Query().Has("maxByte") {
+			maxByte, _ = humanize.ParseBytes(r.URL.Query().Get("maxByte"))
+		}
+		f := pfile.New(path, int64(offsetByte), true)
+		f.CopyToIoWriter(w, part.CopyConfig{MaxByte: maxByte})
 	}
 	return nil
 }
