@@ -39,9 +39,9 @@ type Config struct {
 	lock sync.RWMutex `json:"-"`
 	Addr string       `json:"addr"`
 	TLS  struct {
-		Pub     string   `json:"pub"`
-		Key     string   `json:"key"`
-		Decrypt []string `json:"decrypt"`
+		Pub     string   `json:"pub,omitempty"`
+		Key     string   `json:"key,omitempty"`
+		Decrypt []string `json:"decrypt,omitempty"`
 	} `json:"tls"`
 	RetryBlocks  Blocks               `json:"retryBlocks"`
 	RetryBlocksI pslice.BlocksI[byte] `json:"-"`
@@ -60,9 +60,9 @@ type Config struct {
 }
 
 type Blocks struct {
-	Size string `json:"size"`
+	Size string `json:"size,omitempty"`
 	size int    `json:"-"`
-	Num  int    `json:"num"`
+	Num  int    `json:"num,omitempty"`
 }
 
 func (t *Config) Run(ctx context.Context, logger Logger) (run func()) {
@@ -554,7 +554,7 @@ type Route struct {
 	config *Config  `json:"-"`
 	Path   []string `json:"path"`
 
-	RollRule string `json:"rollRule"`
+	RollRule string `json:"rollRule,omitempty"`
 	// ReqBody  filiter.Body `json:"reqBody"`
 	Setting
 
