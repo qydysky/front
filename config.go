@@ -46,7 +46,6 @@ type Config struct {
 	RetryBlocks  Blocks               `json:"retryBlocks"`
 	RetryBlocksI pslice.BlocksI[byte] `json:"-"`
 	MatchRule    string               `json:"matchRule"`
-	FdPath       string               `json:"fdPath"`
 	CopyBlocks   Blocks               `json:"copyBlocks"`
 	BlocksI      pslice.BlocksI[byte] `json:"-"`
 
@@ -900,8 +899,8 @@ type Setting struct {
 	Splicing           int                `json:"splicing"`
 	ErrBanSec          int                `json:"errBanSec"`
 	InsecureSkipVerify bool               `json:"insecureSkipVerify"`
-	VerifyPeerCer      string             `json:"verifyPeerCer"`
-	Proxy              string             `json:"proxy"`
+	VerifyPeerCer      string             `json:"verifyPeerCer,omitempty"`
+	Proxy              string             `json:"proxy,omitempty"`
 	Filiters           []*filiter.Filiter `json:"filiters"`
 	Dealer             dealer.Dealer      `json:"dealer"`
 	verifyPeerCer      []byte
