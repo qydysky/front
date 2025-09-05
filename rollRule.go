@@ -13,25 +13,25 @@ func init() {
 
 	rollRuleMap[`disable_MinFirst`] = func(backLink []*Back) {
 		slices.SortStableFunc(backLink, func(a, b *Back) int {
-			return int(a.disableC/(a.Weight+1) - b.disableC/(b.Weight+1))
+			return int(a.DisableC/(a.Weight+1) - b.DisableC/(b.Weight+1))
 		})
 	}
 
 	rollRuleMap[`dealingC_MinFirst`] = func(backLink []*Back) {
 		slices.SortStableFunc(backLink, func(a, b *Back) int {
-			return int(a.dealingC/(a.Weight+1) - b.dealingC/(b.Weight+1))
+			return int(a.DealingC/(a.Weight+1) - b.DealingC/(b.Weight+1))
 		})
 	}
 
 	rollRuleMap[`chosenC_MinFirst`] = func(backLink []*Back) {
 		slices.SortStableFunc(backLink, func(a, b *Back) int {
-			return int(a.chosenC/(a.Weight+1) - b.chosenC/(b.Weight+1))
+			return int(a.ChosenC/(a.Weight+1) - b.ChosenC/(b.Weight+1))
 		})
 	}
 
 	rollRuleMap[`loop`] = func(backLink []*Back) {
 		slices.SortStableFunc(backLink, func(a, b *Back) int {
-			return int(time.Since(b.lastChosenT).Milliseconds()*int64(b.Weight+1) - time.Since(a.lastChosenT).Milliseconds()*int64(a.Weight+1))
+			return int(time.Since(b.LastChosenT[0]).Milliseconds()*int64(b.Weight+1) - time.Since(a.LastChosenT[0]).Milliseconds()*int64(a.Weight+1))
 		})
 	}
 }

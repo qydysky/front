@@ -312,11 +312,13 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 
 			backIs = addIfNotExsit(backIs, backEqual, route.FiliterBackByRequest(r)...)
 
+			unlock := BatchRLock(backIs[splicingC:])
 			if f, ok := rollRuleMap[route.RollRule]; ok {
 				f(backIs[splicingC:])
 			} else {
 				rand_Shuffle(backIs[splicingC:])
 			}
+			unlock()
 		}
 
 		if len(backIs) == 0 {
@@ -384,8 +386,9 @@ func (t *Config) addPath(route *Route, routePath string, logger Logger) {
 				continue
 			}
 
+			now := time.Now()
 			backP.lock.Lock()
-			backP.lastChosenT = time.Now()
+			pslice.LoopAddFront(&backP.LastChosenT, &now)
 			backP.lock.Unlock()
 
 			if reqBufUsed {
@@ -647,11 +650,12 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 type Back struct {
 	route       *Route       `json:"-"`
 	lock        sync.RWMutex `json:"-"`
-	upT         time.Time    `json:"-"`
-	lastChosenT time.Time    `json:"-"`
-	disableC    uint         `json:"-"`
-	dealingC    uint         `json:"-"`
-	chosenC     uint         `json:"-"`
+	UpT         time.Time    `json:"upT"`
+	LastChosenT []time.Time  `json:"lastChosenT"`
+	LastFailT   []time.Time  `json:"lastFailT"`
+	DisableC    uint         `json:"disableC"`
+	DealingC    uint         `json:"dealingC"`
+	ChosenC     uint         `json:"chosenC"`
 
 	lastResDru time.Duration `json:"-"`
 
@@ -661,6 +665,17 @@ type Back struct {
 	AlwaysUp bool   `json:"alwaysUp"`
 
 	Setting
+}
+
+func BatchRLock(backs []*Back) (unlock func()) {
+	for _, v := range backs {
+		v.lock.RLock()
+	}
+	return func() {
+		for _, v := range backs {
+			v.lock.RUnlock()
+		}
+	}
 }
 
 func (t *Back) SwapSign(logger Logger) {
@@ -674,8 +689,11 @@ func (t *Back) SwapSign(logger Logger) {
 	} else {
 		t.verifyPeerCer, t.verifyPeerCerErr = os.ReadFile(path)
 	}
-	if t.lastChosenT.IsZero() {
-		t.lastChosenT = time.Now()
+	if len(t.LastChosenT) == 0 {
+		t.LastChosenT = make([]time.Time, 10)
+	}
+	if len(t.LastFailT) == 0 {
+		t.LastFailT = make([]time.Time, 10)
 	}
 	t.AlwaysUp = len(t.route.Backs) == 1 || t.AlwaysUp
 }
@@ -839,15 +857,15 @@ func (t *Back) Id() string {
 
 func (t *Back) be(opT time.Time) {
 	t.lock.Lock()
-	t.chosenC += 1
+	t.ChosenC += 1
 	t.lastResDru = time.Since(opT)
-	t.dealingC += 1
+	t.DealingC += 1
 	t.lock.Unlock()
 }
 
 func (t *Back) ed() {
 	t.lock.Lock()
-	t.dealingC -= 1
+	t.DealingC -= 1
 	t.lock.Unlock()
 }
 
@@ -857,7 +875,7 @@ func (t *Back) IsLive() bool {
 	}
 	t.lock.RLock()
 	defer t.lock.RUnlock()
-	return t.upT.Before(time.Now())
+	return t.UpT.Before(time.Now())
 }
 
 func (t *Back) Disable() {
@@ -868,10 +886,12 @@ func (t *Back) Disable() {
 	if tmp == 0 {
 		tmp = 1
 	}
+	now := time.Now()
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	t.disableC += 1
-	t.upT = time.Now().Add(time.Second * time.Duration(tmp))
+	t.DisableC += 1
+	pslice.LoopAddFront(&t.LastFailT, &now)
+	t.UpT = now.Add(time.Second * time.Duration(tmp))
 }
 
 type Setting struct {

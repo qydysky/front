@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -28,7 +28,7 @@ var logger = plog.New(plog.Config{
 })
 
 func Test5(t *testing.T) {
-	t.Log(strings.Split("127.0.0.1:9090", ":")[0])
+	t.Log(filepath.Clean(".//dd.lof"))
 }
 
 func Benchmark1(b *testing.B) {

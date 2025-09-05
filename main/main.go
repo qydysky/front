@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"flag"
@@ -218,6 +219,13 @@ func main() {
 			webPath.Store(*adminPath+`stop`, func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte("ok"))
 				adminSign <- "stop"
+			})
+			webPath.Store(*adminPath+`config`, func(w http.ResponseWriter, r *http.Request) {
+				if b, e := json.MarshalIndent(&configS, "", "\t"); e != nil {
+					_, _ = w.Write([]byte(`{"err":"` + e.Error() + `"}`))
+				} else {
+					_, _ = w.Write(b)
+				}
 			})
 
 			var hasErr = false
