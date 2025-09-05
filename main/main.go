@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"flag"
@@ -163,7 +162,6 @@ func main() {
 			reloadPath := fmt.Sprintf("http://127.0.0.1:%d%sreload", *adminPort, *adminPath)
 			restartPath := fmt.Sprintf("http://127.0.0.1:%d%srestart", *adminPort, *adminPath)
 			stopPath := fmt.Sprintf("http://127.0.0.1:%d%sstop", *adminPort, *adminPath)
-			configPath := fmt.Sprintf("http://127.0.0.1:%d%sconfig", *adminPort, *adminPath)
 			if *reload {
 				r := reqf.New()
 				if e := r.Reqf(reqf.Rval{
@@ -228,14 +226,6 @@ func main() {
 				_, _ = w.Write([]byte("ok"))
 				adminSign <- "stop"
 			})
-			webPath.Store(*adminPath+`config`, func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set(`Content-Type`, `application/json; charset=utf-8`)
-				if b, e := json.MarshalIndent(&configS, "", "\t"); e != nil {
-					_, _ = w.Write([]byte(`{"err":"` + e.Error() + `"}`))
-				} else {
-					_, _ = w.Write(b)
-				}
-			})
 
 			var hasErr = false
 			timer := time.NewTicker(time.Millisecond * 100)
@@ -248,7 +238,6 @@ func main() {
 					logger.L(`I:`, "重载端口", reloadPath)
 					logger.L(`I:`, "重起端口", restartPath)
 					logger.L(`I:`, "停止端口", stopPath)
-					logger.L(`I:`, "运行信息", configPath)
 					adminCancle = func() { adminSer.Shutdown(ctx) }
 					break
 				} else {
