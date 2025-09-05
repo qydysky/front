@@ -1,8 +1,8 @@
 package dealer
 
 type HeaderDealer struct {
-	Key      string `json:"key"`
-	MatchExp string `json:"matchExp"`
-	Action   string `json:"action"`
-	Value    string `json:"value"`
+	Key      string `json:"key,omitempty"`
+	MatchExp string `json:"matchExp,omitempty"`
+	Action   string `json:"action,omitempty"`
+	Value    string `json:"value,omitempty"`
 }

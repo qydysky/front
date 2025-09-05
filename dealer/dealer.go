@@ -1,9 +1,9 @@
 package dealer
 
 type Dealer struct {
-	ReqUri    []UriDealer    `json:"reqUri"`
-	ReqHeader []HeaderDealer `json:"reqHeader"`
-	ResHeader []HeaderDealer `json:"resHeader"`
-	ResBody   []Body         `json:"resBody"`
-	ResStatus StatusDealer   `json:"resStatus"`
+	ReqUri    []UriDealer    `json:"reqUri,omitempty"`
+	ReqHeader []HeaderDealer `json:"reqHeader,omitempty"`
+	ResHeader []HeaderDealer `json:"resHeader,omitempty"`
+	ResBody   []Body         `json:"resBody,omitempty"`
+	ResStatus StatusDealer   `json:"resStatus,omitempty"`
 }

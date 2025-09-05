@@ -9,8 +9,8 @@ import (
 )
 
 type Uri struct {
-	AccessRule string            `json:"accessRule"`
-	Items      map[string]string `json:"items"`
+	AccessRule string            `json:"accessRule,omitempty"`
+	Items      map[string]string `json:"items,omitempty"`
 }
 
 func (t *Uri) Valid() bool {

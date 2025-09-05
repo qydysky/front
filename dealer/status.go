@@ -1,8 +1,8 @@
 package dealer
 
 type StatusDealer struct {
-	MatchExp string `json:"matchExp"`
-	Value    int    `json:"value"`
+	MatchExp string `json:"matchExp,omitempty"`
+	Value    int    `json:"value,omitempty"`
 }
 
 func (t *StatusDealer) Valid() bool {

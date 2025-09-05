@@ -901,8 +901,8 @@ type Setting struct {
 	InsecureSkipVerify bool               `json:"insecureSkipVerify"`
 	VerifyPeerCer      string             `json:"verifyPeerCer,omitempty"`
 	Proxy              string             `json:"proxy,omitempty"`
-	Filiters           []*filiter.Filiter `json:"filiters"`
-	Dealer             dealer.Dealer      `json:"dealer"`
+	Filiters           []*filiter.Filiter `json:"filiters,omitempty"`
+	Dealer             dealer.Dealer      `json:"dealer,omitempty"`
 	verifyPeerCer      []byte
 	verifyPeerCerErr   error
 }

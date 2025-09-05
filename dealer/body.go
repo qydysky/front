@@ -5,9 +5,9 @@ import (
 )
 
 type Body struct {
-	Action   string `json:"action"`
-	MatchExp string `json:"matchExp"`
-	Value    string `json:"value"`
+	Action   string `json:"action,omitempty"`
+	MatchExp string `json:"matchExp,omitempty"`
+	Value    string `json:"value,omitempty"`
 }
 
 func (t *Body) Valid() bool {

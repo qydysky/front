@@ -8,8 +8,8 @@ import (
 )
 
 type Header struct {
-	AccessRule string                   `json:"accessRule"`
-	Items      map[string]HeaderFiliter `json:"items"`
+	AccessRule string                   `json:"accessRule,omitempty"`
+	Items      map[string]HeaderFiliter `json:"items,omitempty"`
 }
 
 func (t *Header) Valid() bool {

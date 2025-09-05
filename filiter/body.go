@@ -12,9 +12,9 @@ import (
 )
 
 type Body struct {
-	Action   string `json:"action"`
-	ReqSize  string `json:"reqSize"`
-	MatchExp string `json:"matchExp"`
+	Action   string `json:"action,omitempty"`
+	ReqSize  string `json:"reqSize,omitempty"`
+	MatchExp string `json:"matchExp,omitempty"`
 }
 
 func (t *Body) Valid() bool {

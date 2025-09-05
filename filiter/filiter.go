@@ -7,11 +7,11 @@ import (
 
 type Filiter struct {
 	id        unique.Handle[string] `json:"-"`
-	ReqHeader Header                `json:"reqHeader"`
-	ReqHost   Host                  `json:"reqHost"`
-	ReqUri    Uri                   `json:"reqUri"`
-	ResHeader Header                `json:"resHeader"`
-	ReqBody   Body                  `json:"reqBody"`
+	ReqHeader Header                `json:"reqHeader,omitempty"`
+	ReqHost   Host                  `json:"reqHost,omitempty"`
+	ReqUri    Uri                   `json:"reqUri,omitempty"`
+	ResHeader Header                `json:"resHeader,omitempty"`
+	ReqBody   Body                  `json:"reqBody,omitempty"`
 }
 
 func (t *Filiter) Id() *unique.Handle[string] {
@@ -21,11 +21,11 @@ func (t *Filiter) Id() *unique.Handle[string] {
 func (t *Filiter) UnmarshalJSON(b []byte) error {
 	var s = struct {
 		id        unique.Handle[string] `json:"-"`
-		ReqHeader Header                `json:"reqHeader"`
-		ReqHost   Host                  `json:"reqHost"`
-		ReqUri    Uri                   `json:"reqUri"`
-		ResHeader Header                `json:"resHeader"`
-		ReqBody   Body                  `json:"reqBody"`
+		ReqHeader Header                `json:"reqHeader,omitempty"`
+		ReqHost   Host                  `json:"reqHost,omitempty"`
+		ReqUri    Uri                   `json:"reqUri,omitempty"`
+		ResHeader Header                `json:"resHeader,omitempty"`
+		ReqBody   Body                  `json:"reqBody,omitempty"`
 	}{}
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
