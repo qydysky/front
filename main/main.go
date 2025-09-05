@@ -205,6 +205,9 @@ func main() {
 			}
 
 			webPath := &pweb.WebPath{}
+			webPath.Store(*adminPath, func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte("ok"))
+			})
 			webPath.Store(*adminPath+`reload`, func(w http.ResponseWriter, r *http.Request) {
 				if e := pfront.Load(ctx, configF, &configS, logger); e != nil {
 					_, _ = w.Write([]byte("err:" + e.Error()))
