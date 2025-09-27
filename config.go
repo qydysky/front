@@ -251,6 +251,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 						default:
 						}
 					}
+					w.WriteHeader(http.StatusNotFound)
 				}
 			})
 		}
@@ -397,28 +398,28 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, w http.Respons
 		if ok, e := filiter.ReqHost.Match(r); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
 		} else if !ok {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrPatherCheckFail))
+			// logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrPatherCheckFail))
 			continue
 		}
 
 		if ok, e := filiter.ReqUri.Match(r); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
 		} else if !ok {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrPatherCheckFail))
+			// logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrPatherCheckFail))
 			continue
 		}
 
 		if ok, e := filiter.ReqHeader.Match(r.Header); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
 		} else if !ok {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrHeaderCheckFail))
+			// logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrHeaderCheckFail))
 			continue
 		}
 
 		if ok, e := filiter.ReqBody.Match(r); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
 		} else if !ok {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrBodyCheckFail))
+			// logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrBodyCheckFail))
 			continue
 		}
 		noPassFiliter = false
