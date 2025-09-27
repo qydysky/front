@@ -2,55 +2,89 @@ package front
 
 import (
 	"iter"
-	"sync"
+
+	psync "github.com/qydysky/part/sync"
 )
 
 type Pather struct {
+	Per    *Pather
 	Next   *Pather
 	Dealer *Route
-	l      sync.RWMutex
+	l      psync.RWMutex
+}
+
+func NewPather() *Pather {
+	return &Pather{}
 }
 
 func (t *Pather) Add(r *Route) {
-	t.l.Lock()
-	defer t.l.Unlock()
+	ul := t.l.RLock()
+	nextP := t.Next
+	ul()
 
-	if t.Dealer == nil {
-		t.Dealer = r
-	} else if t.Next == nil {
+	if nextP == nil {
+		ul := t.l.Lock()
 		t.Next = &Pather{
+			Per:    t,
 			Dealer: r,
 		}
+		ul()
 	} else {
-		t.Next.Add(r)
+		nextP.Add(r)
 	}
 }
 
 func (t *Pather) Del(r *Route) {
-	t.l.Lock()
-	defer t.l.Unlock()
+	ul := t.l.RLock()
+	isCur := t.Dealer == r
+	nextP := t.Next
+	perP := t.Per
+	ul()
 
-	if t.Dealer == r {
-		t.Dealer = nil
-	} else if t.Next == nil {
-		t.Next = &Pather{
-			Dealer: r,
+	if isCur {
+		ul := perP.l.Lock()
+		perP.Next = nextP
+		ul()
+		if nextP != nil {
+			ul := nextP.l.Lock()
+			nextP.Per = perP
+			ul()
 		}
-	} else {
-		t.Next.Add(r)
+	} else if nextP != nil {
+		nextP.Del(r)
 	}
 }
 
-// return true if not matched
+func (t *Pather) Size() (i uint32) {
+	tmp := t
+	for {
+		ul := tmp.l.RLock()
+		nextP := tmp.Next
+		ul()
+		if nextP != nil {
+			i++
+			tmp = nextP
+		} else {
+			return
+		}
+	}
+}
+
 func (t *Pather) Range() iter.Seq[*Route] {
 	return func(yield func(*Route) bool) {
 		tmp := t
 		for {
-			tmp.l.RLock()
-			if yield(tmp.Dealer) && tmp.Next != nil {
+			ul := tmp.l.RLock()
+			if tmp.Dealer != nil && !yield(tmp.Dealer) {
+				ul()
+				return
+			} else if tmp.Next == nil {
+				ul()
+				return
+			} else {
 				tmp = tmp.Next
+				ul()
 			}
-			tmp.l.RUnlock()
 		}
 	}
 }
