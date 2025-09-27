@@ -35,6 +35,8 @@ type File interface {
 }
 
 // 加载
+//
+// Deprecated: not safety
 func LoadPeriod(ctx context.Context, configF *pfile.File, configS *[]Config, logger Logger) error {
 	if e := Load(ctx, configF, configS, logger); e != nil {
 		return e

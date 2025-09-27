@@ -31,19 +31,18 @@ func main() {
 
 	// 获取config路径
 	var (
-		configP      = flag.String("c", "main.json", "config")
-		logFile      = flag.String("logFile", "", "logFile, defalut no log file")
-		adminPort    = flag.Int("adminPort", 0, "adminPort, eg:10908")
-		adminPath    = flag.String("adminPath", "", "adminPath, eg:/123/12/")
-		reload       = flag.Bool("reload", false, "reload, when adminPort/adminPath set")
-		restart      = flag.Bool("restart", false, "restart, when adminPort/adminPath set")
-		stop         = flag.Bool("stop", false, "stop, when adminPort/adminPath set")
-		noLog        = flag.Bool("noLog", false, "noLog")
-		noDebugLog   = flag.Bool("noDebugLog", false, "noDebugLog")
-		noAutoReload = flag.Bool("noAutoReload", false, "noAutoReload")
-		genKey       = flag.Bool("genKey", false, "gen new pub.pem and pri.pem")
-		decrypt      = flag.String("decrypt", "", "decrypt with pri.pem")
-		encrypt      = flag.String("encrypt", "", "encrypt with pub.pem")
+		configP    = flag.String("c", "main.json", "config")
+		logFile    = flag.String("logFile", "", "logFile, defalut no log file")
+		adminPort  = flag.Int("adminPort", 0, "adminPort, eg:10908")
+		adminPath  = flag.String("adminPath", "", "adminPath, eg:/123/12/")
+		reload     = flag.Bool("reload", false, "reload, when adminPort/adminPath set")
+		restart    = flag.Bool("restart", false, "restart, when adminPort/adminPath set")
+		stop       = flag.Bool("stop", false, "stop, when adminPort/adminPath set")
+		noLog      = flag.Bool("noLog", false, "noLog")
+		noDebugLog = flag.Bool("noDebugLog", false, "noDebugLog")
+		genKey     = flag.Bool("genKey", false, "gen new pub.pem and pri.pem")
+		decrypt    = flag.String("decrypt", "", "decrypt with pri.pem")
+		encrypt    = flag.String("encrypt", "", "encrypt with pub.pem")
 	)
 	flag.Parse()
 
@@ -256,11 +255,7 @@ func main() {
 
 		logger.L(`I:`, "启动")
 		// 加载配置
-		if !*noAutoReload {
-			if e := pfront.LoadPeriod(ctx, configF, &configS, logger); e != nil {
-				return
-			}
-		} else if e := pfront.Load(ctx, configF, &configS, logger); e != nil {
+		if e := pfront.Load(ctx, configF, &configS, logger); e != nil {
 			return
 		}
 

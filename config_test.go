@@ -47,6 +47,93 @@ func Benchmark1(b *testing.B) {
 	}
 }
 
+func Test_Uri6(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	j := []byte(`
+	{
+		"addr": "127.0.0.1:19000",
+		"routes": [
+			{
+				"name": "1",
+				"path": ["/test/"],
+				"pathAdd": true,
+				"filiters": [
+					{
+						"reqUri": {
+							"accessRule": "{a}",
+							"items": {
+								"a": "2"
+							}
+						}
+					}
+				],
+				"backs": [
+					{
+						"name": "1",
+						"dealer": {
+							"resStatus": {
+								"value": 302
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "2",
+				"path": ["/test/"],
+				"pathAdd": true,
+				"backs": [
+					{
+						"name": "2",
+						"dealer": {
+							"resStatus": {
+								"value": 301
+							}
+						}
+					}
+				]
+			}
+		]
+	}
+	`)
+
+	conf := &Config{}
+	if e := json.Unmarshal(j, conf); e != nil {
+		t.Fatal(e)
+	}
+
+	go conf.Run(ctx, logger)()
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	r.Reqf(reqf.Rval{
+		Ctx: ctx,
+		Url: "http://127.0.0.1:19000/test/1",
+	})
+
+	r.Response(func(r *http.Response) error {
+		if r.StatusCode != 301 {
+			t.Fatal()
+		}
+		return nil
+	})
+
+	r.Reqf(reqf.Rval{
+		Ctx: ctx,
+		Url: "http://127.0.0.1:19000/test/2",
+	})
+
+	r.Response(func(r *http.Response) error {
+		if r.StatusCode != 302 {
+			t.Fatal()
+		}
+		return nil
+	})
+}
+
 func Test_Uri5(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
