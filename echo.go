@@ -28,10 +28,10 @@ func (echoDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 	var (
 		env       = make(map[string]string)
 		opT       = time.Now()
-		logFormat = "%v %v %v%v > %v echo %v %v %v"
+		logFormat = "%v %v %v%v > %v > %v echo %v %v %v"
 	)
 
-	logger.Debug(`T:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT)))
+	logger.Debug(`T:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT)))
 
 	if chosenBack.getSplicing() != 0 {
 		cookie := &http.Cookie{

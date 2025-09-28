@@ -33,13 +33,13 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 	var (
 		env       = make(map[string]string)
 		opT       = time.Now()
-		logFormat = "%v %v %v%v > %v local %v %v %v"
+		logFormat = "%v %v %v%v > %v > %v local %v %v %v"
 	)
 
 	path := chosenBack.To
 	if chosenBack.getPathAdd() {
 		if s, e := url.PathUnescape(r.URL.Path); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", e, time.Since(opT)))
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, "Err", e, time.Since(opT)))
 			return ErrDealReqUri
 		} else {
 			path += s
@@ -49,11 +49,11 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 	path = filepath.Clean(dealUri(path, chosenBack.getDealerReqUri()))
 
 	if !pfile.New(path, 0, true).IsExist() {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "Err", errors.New("NotExist "+path), time.Since(opT)))
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, "Err", errors.New("NotExist "+path), time.Since(opT)))
 		return MarkRetry(os.ErrNotExist)
 	}
 
-	logger.Debug(`T:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT)))
+	logger.Debug(`T:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT)))
 
 	if chosenBack.getSplicing() != 0 {
 		cookie := &http.Cookie{
@@ -76,7 +76,7 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 	// if e :=
 	copyHeader(env, http.Header{}, w.Header(), chosenBack.getDealerResHeader())
 	// ; e != nil {
-	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, "BLOCK", e, time.Since(opT)))
 	// 	return ErrDealResHeader
 	// }
 
