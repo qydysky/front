@@ -147,10 +147,6 @@ func setEnvIfNot(m map[string]string, key, val string) {
 	}
 }
 
-func setEnv(m map[string]string, key, val string) {
-	m[key] = val
-}
-
 // var header = "X-Front-"
 var cookie = fmt.Sprintf("_psign_%p_%s", &struct{}{}, time.Now().Format("20060102150405"))
 var (

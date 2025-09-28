@@ -49,6 +49,7 @@ Usage of ./main:
         "addr": "127.0.0.1:10000",
         "routes": [
             {
+                "name": "route1",
                 "path": ["/"],
                 "pathAdd": true,
                 "filiters": [{
@@ -113,7 +114,8 @@ config:
     - *key*: string 私钥pem路径，支持从`http`/`https`获取
     - *decrypt*: []string cmd解密key，公/私钥会通过stdin输入，并使用stdout输出作为实际使用公/私钥，为空时不执行
 - routes: [] 路由
-    - path: []string 路径
+    - name: string 路由名称，将在日志中显示
+    - path: []string 路由路径
     - rollRule: string 可选
         - `order`(按顺序，每次都从第一个开始尝试)
         - `loop`(轮流)
