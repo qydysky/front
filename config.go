@@ -195,7 +195,7 @@ func (t *Config) startServer(logger Logger, conf *http.Server) (shutdown func(ct
 	case `prefix`:
 		fallthrough
 	default:
-		matchFunc = t.webpath.LoadOnePerfix
+		matchFunc = t.webpath.LoadPerfix
 	}
 
 	var hasErr = false

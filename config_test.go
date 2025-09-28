@@ -191,7 +191,7 @@ func Test_Uri4(t *testing.T) {
 		Addr: "127.0.0.1:19001",
 	})
 	web.Handle(map[string]func(http.ResponseWriter, *http.Request){
-		`/test/1`: func(w http.ResponseWriter, r *http.Request) {
+		`/test/1/1`: func(w http.ResponseWriter, r *http.Request) {
 			io.Copy(w, r.Body)
 		},
 	})
@@ -240,7 +240,7 @@ func Test_Uri4(t *testing.T) {
 	r := reqf.New()
 	r.Reqf(reqf.Rval{
 		Ctx:     ctx,
-		Url:     "http://127.0.0.1:19000/test/1",
+		Url:     "http://127.0.0.1:19000/test/1/1",
 		PostStr: "123",
 	})
 
