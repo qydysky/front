@@ -30,8 +30,6 @@ Usage of ./main:
         gen new pub.pem and pri.pem
   -logFile string
         logFile, defalut no log file
-  -noAutoReload
-        noAutoReload
   -noDebugLog
         noDebugLog
   -noLog
