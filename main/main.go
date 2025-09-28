@@ -211,7 +211,7 @@ func main() {
 				_, _ = w.Write([]byte("ok"))
 			})
 			webPath.Store(*adminPath+`reload`, func(w http.ResponseWriter, r *http.Request) {
-				if e := pfront.Load(ctx, configF, &configS, logger); e != nil {
+				if e := pfront.Load(configF, &configS); e != nil {
 					_, _ = w.Write([]byte("err:" + e.Error()))
 				} else {
 					_, _ = w.Write([]byte("ok"))
@@ -255,7 +255,8 @@ func main() {
 
 		logger.L(`I:`, "启动")
 		// 加载配置
-		if e := pfront.Load(ctx, configF, &configS, logger); e != nil {
+		if e := pfront.Load(configF, &configS); e != nil {
+			logger.L(`E:`, e)
 			return
 		}
 

@@ -35,34 +35,14 @@ type File interface {
 }
 
 // 加载
-//
-// Deprecated: not safety
-func LoadPeriod(ctx context.Context, configF *pfile.File, configS *[]Config, logger Logger) error {
-	if e := Load(ctx, configF, configS, logger); e != nil {
-		return e
-	}
-
-	// 定时加载config
-	go func() {
-		ctx1, done1 := pctx.WaitCtx(ctx)
-		defer done1()
-		for {
-			select {
-			case <-time.After(time.Second * 5):
-				_ = Load(ctx, configF, configS, logger)
-			case <-ctx1.Done():
-				return
-			}
-		}
-	}()
-	return nil
-}
-
-// 加载
-func Load(ctx context.Context, configF *pfile.File, configS *[]Config, logger Logger) error {
+func Load(configF *pfile.File, configS *[]Config) error {
 	var buf, _ = configF.ReadAll(humanize.KByte, humanize.MByte)
-	if e := loadConfig(ctx, buf, configS, logger); e != nil {
-		return e
+	if !json.Valid(buf) {
+		return errors.New(`json inValid`)
+	} else {
+		if e := json.Unmarshal(buf, configS); e != nil {
+			return e
+		}
 	}
 	return nil
 }
@@ -98,28 +78,6 @@ func Test(ctx context.Context, port int, logger Logger) {
 		},
 	})
 	<-ctx1.Done()
-}
-
-func loadConfig(ctx context.Context, buf []byte, configS *[]Config, logger Logger) (e error) {
-	// defer func() {
-	// 	if err := recover(); err != nil {
-	// 		logger.Error(`E:`, err)
-	// 		e = errors.New("read panic")
-	// 	}
-	// }()
-	if !json.Valid(buf) {
-		return errors.New(`json inValid`)
-	} else {
-		if e := json.Unmarshal(buf, configS); e != nil {
-			return e
-		}
-		for i := 0; i < len(*configS); i++ {
-			(*configS)[i].lock.Lock()
-			(*configS)[i].SwapSign(ctx, logger)
-			(*configS)[i].lock.Unlock()
-		}
-	}
-	return
 }
 
 func dealUri(s string, app iter.Seq[dealer.UriDealer]) (t string) {
