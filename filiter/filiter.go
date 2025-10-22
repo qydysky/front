@@ -12,6 +12,7 @@ type Filiter struct {
 	ReqUri    Uri                   `json:"reqUri,omitempty"`
 	ResHeader Header                `json:"resHeader,omitempty"`
 	ReqBody   Body                  `json:"reqBody,omitempty"`
+	ReqAddr   Addr                  `json:"reqAddr,omitempty"`
 }
 
 func (t *Filiter) Id() *unique.Handle[string] {
@@ -26,6 +27,7 @@ func (t *Filiter) UnmarshalJSON(b []byte) error {
 		ReqUri    Uri                   `json:"reqUri,omitempty"`
 		ResHeader Header                `json:"resHeader,omitempty"`
 		ReqBody   Body                  `json:"reqBody,omitempty"`
+		ReqAddr   Addr                  `json:"reqAddr,omitempty"`
 	}{}
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err

@@ -150,6 +150,10 @@ setting: setting代指下述各配置
 
     filiters中同个{}为和关系，不同{}为或关系
 
+    - reqAddr:{} 请求后端前，请求Addr过滤器
+        - accessRule:string 布尔表达式，为true时才通过,例`{id}|(!{id2}&{id3})`
+        - items: map[string]string
+            - id: matchExp
     - reqHost:{} 请求后端前，请求Host过滤器
         - accessRule:string 布尔表达式，为true时才通过,例`{id}|(!{id2}&{id3})`
         - items: map[string]string
@@ -198,5 +202,5 @@ setting: setting代指下述各配置
         - matchExp: string 正则表达式
         - value: int
 
-可以使用的环境变量(仅能单独使用)：
+可以使用的环境变量(仅能单独使用，不能和字符串拼合等)：
 - `$remote_addr`:当存在`X-Real-IP`头时，取其值，否则取请求端的远程地址。在`dealer.reqHeader.value`、`dealer.resHeader.value`可用

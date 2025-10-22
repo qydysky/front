@@ -359,6 +359,9 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 			if passFiliter != nil && filiter.Id() != passFiliter {
 				continue
 			}
+			if ok, e := filiter.ReqAddr.Match(r); !ok || e != nil {
+				continue
+			}
 			if ok, e := filiter.ReqHost.Match(r); !ok || e != nil {
 				continue
 			}
@@ -395,31 +398,33 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, w http.Respons
 	var noPassFiliter bool
 	for filiter := range t.getFiliters() {
 		noPassFiliter = true
+		if ok, e := filiter.ReqAddr.Match(r); e != nil {
+			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
+		} else if !ok {
+			continue
+		}
+
 		if ok, e := filiter.ReqHost.Match(r); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
 		} else if !ok {
-			// logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrPatherCheckFail))
 			continue
 		}
 
 		if ok, e := filiter.ReqUri.Match(r); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
 		} else if !ok {
-			// logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrPatherCheckFail))
 			continue
 		}
 
 		if ok, e := filiter.ReqHeader.Match(r.Header); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
 		} else if !ok {
-			// logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrHeaderCheckFail))
 			continue
 		}
 
 		if ok, e := filiter.ReqBody.Match(r); e != nil {
 			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
 		} else if !ok {
-			// logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrBodyCheckFail))
 			continue
 		}
 		noPassFiliter = false
@@ -442,6 +447,9 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, w http.Respons
 				var noPassFiliter bool
 				for filiter := range backP.(*Back).getFiliters() {
 					noPassFiliter = true
+					if ok, e := filiter.ReqAddr.Match(r); !ok || e != nil {
+						continue
+					}
 					if ok, e := filiter.ReqHost.Match(r); !ok || e != nil {
 						continue
 					}
