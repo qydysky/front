@@ -6,7 +6,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/qydysky/brotli v0.0.0-20250531004300-54adcf96cc4a
-	github.com/qydysky/part v0.28.20251021085608
+	github.com/qydysky/part v0.28.20251023175040
 	golang.org/x/net v0.39.0
 )
 
