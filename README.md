@@ -123,6 +123,7 @@ config:
         - `dealingC_MinFirst`(连接数较少的优先)
         - `chosenC_MinFirst`(被选择较少的优先)
         - (使用rand.Shuffle随机，默认)
+    - alwaysUp: bool 总是在线，当所有后端都在禁用时，启用被禁用次数最少的一个后端
     - setting... 将会给backs默认值
     - backs: [] 后端
         - name: string 后端名称，将在日志中显示
@@ -131,14 +132,13 @@ config:
             - 含有`://`时，例`s://www.baidu.com`，会根据客户端自动添加http or ws在地址前
             - 不含`://`时，将会尝试解析成本地文件，当指向zip文件，将尝试读取
         - weight: string uint 权重，按routes中的全部back的权重比分配，当权重为0时，将停止新请求的进入
-        - alwaysUp: bool 总是在线， 当只有一个后端时，默认为true
         - setting...
 
 setting: setting代指下述各配置
 
 - pathAdd: bool 将客户端访问的路径附加在path上 例：/api/req => /ws => /ws/api/req
 - splicing: int 当客户端支持cookie时，将会固定使用后端多少秒，默认不启用
-- errToSec: float64 当后端响应超过(ws则指初次返回时间)指定秒，将会触发errBanSec
+- errToSec: float64 当后端响应超过(ws则指初次返回时间)指定秒，将会errBanSec
 - errBanSec: int 当后端错误时（指连接失败，不指后端错误响应），将会禁用若干秒
 - insecureSkipVerify: bool 忽略不安全的tls证书
 - verifyPeerCer: string 路径，校验服务器证书，使用intermediate_ca

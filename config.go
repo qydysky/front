@@ -295,6 +295,7 @@ type Route struct {
 
 	RollRule string `json:"rollRule,omitempty"`
 	// ReqBody  filiter.Body `json:"reqBody"`
+	AlwaysUp bool `json:"alwaysUp"`
 	Setting
 
 	backMap sync.Map `json:"-"`
@@ -376,9 +377,6 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 			break
 		}
 		if noPassFiliter {
-			continue
-		}
-		if !t.Backs[i].AlwaysUp && t.Backs[i].Weight == 0 {
 			continue
 		}
 
@@ -484,6 +482,20 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, w http.Respons
 	if len(backIs) == 0 {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrNoRoute))
 		return ErrNoRoute
+	} else {
+		needUp := 0
+		unlock := BatchRLock(backIs)
+		for i := 0; i < len(backIs) && needUp >= 0; i++ {
+			if backIs[i].IsLive() {
+				needUp = -1
+			} else if backIs[needUp].DisableC > backIs[i].DisableC {
+				needUp = i
+			}
+		}
+		unlock()
+		if needUp > 0 && t.AlwaysUp {
+			backIs[needUp].Enable()
+		}
 	}
 
 	var e error = ErrAllBacksFail
@@ -562,13 +574,13 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, w http.Respons
 		}
 
 		if backP.To == "" {
-			e = component2.Get[reqDealer]("echo").Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+			e = component2.GetV3[reqDealer]("echo").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
 		} else if !strings.Contains(backP.To, "://") {
-			e = component2.Get[reqDealer]("local").Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+			e = component2.GetV3[reqDealer]("local").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
 		} else if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
-			e = component2.Get[reqDealer]("ws").Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+			e = component2.GetV3[reqDealer]("ws").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
 		} else {
-			e = component2.Get[reqDealer]("http").Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+			e = component2.GetV3[reqDealer]("http").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
 		}
 
 		if e == nil {
@@ -621,10 +633,9 @@ type Back struct {
 
 	lastResDru time.Duration `json:"-"`
 
-	Name     string `json:"name"`
-	To       string `json:"to"`
-	Weight   uint   `json:"weight,string"`
-	AlwaysUp bool   `json:"alwaysUp"`
+	Name   string `json:"name"`
+	To     string `json:"to"`
+	Weight uint   `json:"weight,string"`
 
 	Setting
 }
@@ -657,7 +668,6 @@ func (t *Back) SwapSign(logger Logger) {
 	if len(t.LastFailT) == 0 {
 		t.LastFailT = make([]time.Time, 10)
 	}
-	t.AlwaysUp = len(t.route.Backs) == 1 || t.AlwaysUp
 }
 
 func (t *Back) getProxy() string {
@@ -832,28 +842,26 @@ func (t *Back) ed() {
 }
 
 func (t *Back) IsLive() bool {
-	if t.AlwaysUp {
-		return true
-	}
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	return t.UpT.Before(time.Now())
 }
 
 func (t *Back) Disable() {
-	if t.AlwaysUp {
-		return
-	}
-	tmp := t.getErrBanSec()
-	if tmp == 0 {
-		tmp = 1
-	}
 	now := time.Now()
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.DisableC += 1
 	pslice.LoopAddFront(&t.LastFailT, &now)
-	t.UpT = now.Add(time.Second * time.Duration(tmp))
+	if tmp := t.getErrBanSec(); tmp > 0 {
+		t.UpT = now.Add(time.Second * time.Duration(tmp))
+	}
+}
+
+func (t *Back) Enable() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.UpT = time.Now()
 }
 
 type Setting struct {
