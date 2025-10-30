@@ -330,8 +330,7 @@ type Route struct {
 	Path   []string `json:"path"`
 
 	RollRule string `json:"rollRule,omitempty"`
-	// ReqBody  filiter.Body `json:"reqBody"`
-	AlwaysUp bool `json:"alwaysUp"`
+	AlwaysUp bool   `json:"alwaysUp"`
 	Setting
 
 	backMap sync.Map `json:"-"`
@@ -529,7 +528,8 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 			}
 		}
 		unlock()
-		if needUp > 0 && t.AlwaysUp {
+		if needUp >= 0 && t.AlwaysUp {
+			logger.Warn(`W:`, fmt.Sprintf(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backIs[needUp].Name, "Err", ErrReUp))
 			backIs[needUp].Enable()
 		}
 	}
@@ -576,6 +576,7 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 		}
 	}
 
+	err = ErrAllBacksFail
 	for _, backP := range backIs {
 		if !backP.IsLive() {
 			continue

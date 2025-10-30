@@ -171,6 +171,7 @@ var (
 	ErrAllBacksFail      = errors.New("ErrAllBacksFail")
 	ErrBackFail          = errors.New("ErrBackFail")
 	ErrNoRoute           = errors.New("ErrNoRoute")
+	ErrReUp              = errors.New("ErrReUp")
 	ErrDealReqUri        = errors.New("ErrDealReqUri")
 	ErrDealReqHeader     = errors.New("ErrDealReqHeader")
 	ErrDealResHeader     = errors.New("ErrDealResHeader")

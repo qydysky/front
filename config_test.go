@@ -851,9 +851,11 @@ func Test_Retry2(t *testing.T) {
 func Test_ResBody(t *testing.T) {
 	ctx := t.Context()
 
-	pweb.New(&http.Server{
+	w1 := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",
-	}).Handle(map[string]func(http.ResponseWriter, *http.Request){
+	})
+	defer w1.Shutdown()
+	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
 		`/`: func(w http.ResponseWriter, r *http.Request) {
 			io.Copy(w, r.Body)
 		},
@@ -910,4 +912,59 @@ func Test_ResBody(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+func Test_AlwaysUp(t *testing.T) {
+	ctx := t.Context()
+
+	w1 := pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	})
+	defer w1.Shutdown()
+	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/`: func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte{'1'})
+		},
+	})
+
+	conf := &Config{
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path:     []string{"/"},
+				RollRule: "order",
+				AlwaysUp: true,
+				Setting: Setting{
+					PathAdd:   true,
+					ErrBanSec: 2,
+				},
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+					},
+				},
+			},
+		},
+	}
+
+	go conf.Run(ctx, logger)()
+
+	time.Sleep(time.Second)
+	conf.Routes[0].Backs[0].Disable()
+
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/",
+	}); e != nil {
+		t.Fatal(e)
+	} else {
+		r.Respon(func(b []byte) error {
+			if b[0] != '1' {
+				t.Fatal()
+			}
+			return nil
+		})
+	}
 }
