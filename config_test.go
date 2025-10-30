@@ -968,3 +968,113 @@ func Test_AlwaysUp(t *testing.T) {
 		})
 	}
 }
+
+func Test_Filiter(t *testing.T) {
+	ctx := t.Context()
+
+	conf := &Config{
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path:     []string{"/"},
+				RollRule: "order",
+				Setting: Setting{
+					PathAdd: true,
+					Filiters: []*filiter.Filiter{
+						{
+							ReqHeader: filiter.Header{
+								AccessRule: "{access}",
+								Items: map[string]filiter.HeaderFiliter{
+									"access": {
+										Key:      "X-P-A",
+										MatchExp: "1",
+									},
+								},
+							},
+						},
+					},
+				},
+				Backs: []Back{
+					{
+						Name:   "1",
+						Weight: 1,
+						Setting: Setting{
+							Filiters: []*filiter.Filiter{
+								{
+									ReqHeader: filiter.Header{
+										AccessRule: "{access}",
+										Items: map[string]filiter.HeaderFiliter{
+											"access": {
+												Key:      "X-P-B",
+												MatchExp: "1",
+											},
+										},
+									},
+								},
+							},
+							Dealer: dealer.Dealer{
+								ResStatus: dealer.StatusDealer{
+									Value: 201,
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				Path:     []string{"/"},
+				RollRule: "order",
+				Setting: Setting{
+					PathAdd: true,
+				},
+				Backs: []Back{
+					{
+						Name:   "2",
+						Weight: 1,
+						Setting: Setting{
+							Dealer: dealer.Dealer{
+								ResStatus: dealer.StatusDealer{
+									Value: 202,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	go conf.Run(ctx, logger)()
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/",
+		Header: map[string]string{
+			"X-P-A": "1",
+			"X-P-B": "1",
+		},
+	}); e != nil {
+		t.Fatal(e)
+	} else if r.ResStatusCode() != 201 {
+		t.Fatal()
+	}
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/",
+		Header: map[string]string{
+			"X-P-A": "1",
+		},
+	}); e != nil {
+		t.Fatal(e)
+	} else if r.ResStatusCode() != 202 {
+		t.Fatal()
+	}
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/",
+	}); e != nil {
+		t.Fatal(e)
+	} else if r.ResStatusCode() != 202 {
+		t.Fatal()
+	}
+}

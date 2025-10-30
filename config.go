@@ -515,7 +515,6 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 	}
 
 	if len(backIs) == 0 {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "BLOCK", ErrNoRoute))
 		return ErrNoRoute
 	} else {
 		needUp := 0

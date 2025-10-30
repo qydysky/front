@@ -146,7 +146,9 @@ setting: setting代指下述各配置
 
 - filiters: []
     
-    请求将从上至下尝试route的back的filiter(reqAddr、reqHost、reqUri、reqHeader)，匹配成功时，附加back到处理序列，序列从上至下进行尝试
+    请求将从上至下尝试route的filiter(reqAddr、reqHost、reqUri、reqHeader)，匹配成功时，附加back到处理序列
+
+    然后依次尝试序列中back的filiter，直到某个back成功响应
 
     filiters中同个{}为和关系，不同{}为或关系
 
