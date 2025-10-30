@@ -560,6 +560,7 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 							w.WriteHeader(http.StatusBadRequest)
 							return nil
 						}
+						reqBuf.allReaded = true
 						break
 					} else if n == 0 {
 						break
