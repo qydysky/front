@@ -2,7 +2,6 @@ package front
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -48,8 +47,7 @@ func Benchmark1(b *testing.B) {
 }
 
 func Test_Uri6(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	j := []byte(`
 	{
@@ -135,8 +133,7 @@ func Test_Uri6(t *testing.T) {
 }
 
 func Test_Uri5(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	j := []byte(`
 	{
@@ -184,8 +181,7 @@ func Test_Uri5(t *testing.T) {
 }
 
 func Test_Uri4(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	web := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",
@@ -253,8 +249,7 @@ func Test_Uri4(t *testing.T) {
 }
 
 func Test_Uri3(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	web := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",
@@ -345,8 +340,7 @@ func Test_Uri3(t *testing.T) {
 }
 
 func Test_Uri2(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	web := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",
@@ -404,8 +398,7 @@ func Test_Uri2(t *testing.T) {
 }
 
 func Test_Uri(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	customFiliter := &filiter.Filiter{
 		ReqUri: filiter.Uri{
@@ -462,8 +455,7 @@ func Test_Uri(t *testing.T) {
 }
 
 func Test_Back(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	conf := &Config{
 		Addr: "127.0.0.1:19000",
@@ -529,12 +521,13 @@ func Test_Back(t *testing.T) {
 }
 
 func Test_Res(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
-	pweb.New(&http.Server{
+	w1 := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",
-	}).Handle(map[string]func(http.ResponseWriter, *http.Request){
+	})
+	defer w1.Shutdown()
+	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
 		`/`: func(w http.ResponseWriter, r *http.Request) {
 			io.Copy(w, r.Body)
 		},
@@ -589,16 +582,17 @@ func Test_Res(t *testing.T) {
 }
 
 func Test_Cookie(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	c1 := "login_locale=zh_CN; Max-Age=31536000; Expires=Wed, 15 Apr 2026 02:29:42; Path=/"
 	c2 := "login_locale=zh_CN; Max-Age=31536000; Expires=Wed, 15 Apr 2026 02:29:43; Path=/"
 	c3 := "ts=11111111111"
 
-	pweb.New(&http.Server{
+	w1 := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19002",
-	}).Handle(map[string]func(http.ResponseWriter, *http.Request){
+	})
+	defer w1.Shutdown()
+	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
 		`/`: func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("Set-Cookie", c1)
 			w.Header().Add("Set-Cookie", c2)
@@ -654,12 +648,13 @@ func Test_Cookie(t *testing.T) {
 }
 
 func Test_Retry(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
-	pweb.New(&http.Server{
+	w1 := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19002",
-	}).Handle(map[string]func(http.ResponseWriter, *http.Request){
+	})
+	defer w1.Shutdown()
+	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
 		`/`: func(w http.ResponseWriter, r *http.Request) {
 			io.Copy(w, r.Body)
 		},
@@ -710,11 +705,13 @@ func Test_Retry(t *testing.T) {
 func Test_Retry2(t *testing.T) {
 	ctx := t.Context()
 
-	pweb.New(&http.Server{
+	w1 := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19002",
-	}).Handle(map[string]func(http.ResponseWriter, *http.Request){
-		`/`: func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, r.Body)
+	})
+	defer w1.Shutdown()
+	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/1/`: func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte{'2'})
 		},
 	})
 
@@ -723,15 +720,29 @@ func Test_Retry2(t *testing.T) {
 			Num:  10,
 			Size: "3B",
 		},
-		Addr: "127.0.0.1:19000",
+		Addr: "127.0.0.1:19003",
 		Routes: []Route{
 			{
-				Name: "1",
-				Path: []string{"/"},
+				Name:     "1",
+				Path:     []string{"/1/"},
+				AlwaysUp: true,
 				Setting: Setting{
 					PathAdd: true,
+					Filiters: []*filiter.Filiter{
+						{
+							ReqHeader: filiter.Header{
+								AccessRule: "{access}",
+								Items: map[string]filiter.HeaderFiliter{
+									"access": {
+										Key:      "X-P-BACK",
+										MatchExp: "19001",
+									},
+								},
+							},
+						},
+					},
 				},
-				RollRule: "order",
+				RollRule: "loop",
 				Backs: []Back{
 					{
 						Name:   "1",
@@ -741,15 +752,16 @@ func Test_Retry2(t *testing.T) {
 				},
 			},
 			{
-				Name: "2",
-				Path: []string{"/"},
+				Name:     "2",
+				Path:     []string{"/1/"},
+				AlwaysUp: true,
 				Setting: Setting{
 					PathAdd: true,
 				},
-				RollRule: "order",
+				RollRule: "loop",
 				Backs: []Back{
 					{
-						Name:   "1",
+						Name:   "2",
 						To:     "://127.0.0.1:19002",
 						Weight: 1,
 					},
@@ -764,16 +776,80 @@ func Test_Retry2(t *testing.T) {
 
 	r := reqf.New()
 	if e := r.Reqf(reqf.Rval{
-		Url: "http://127.0.0.1:19000/",
-		// PostStr: "1",
+		Url: "http://127.0.0.1:19003/1/",
+	}); e != nil {
+		t.Fatal(e)
+	} else {
+		_ = r.Respon(func(b []byte) error {
+			if b[0] != '2' {
+				t.Fatal()
+			}
+			return nil
+		})
+	}
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19003/1/",
+		Header: map[string]string{
+			"X-P-BACK": "19001",
+		},
 	}); e != nil {
 		t.Fatal()
+	} else {
+		_ = r.Respon(func(b []byte) error {
+			if b[0] != '2' {
+				t.Fatal()
+			}
+			return nil
+		})
+	}
+
+	// first up
+	w2 := pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	})
+	w2.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/1/`: func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte{'1'})
+		},
+	})
+
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19003/1/",
+		Header: map[string]string{
+			"X-P-BACK": "19001",
+		},
+	}); e != nil {
+		t.Fatal()
+	} else {
+		_ = r.Respon(func(b []byte) error {
+			if b[0] != '1' {
+				t.Fatal()
+			}
+			return nil
+		})
+	}
+
+	w2.Shutdown()
+
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19003/1/",
+		Header: map[string]string{
+			"X-P-BACK": "19001",
+		},
+	}); e != nil {
+		t.Fatal()
+	} else {
+		_ = r.Respon(func(b []byte) error {
+			if b[0] != '2' {
+				t.Fatal()
+			}
+			return nil
+		})
 	}
 }
 
 func Test_ResBody(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",

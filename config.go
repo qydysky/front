@@ -259,7 +259,8 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					)
 					if t.RetryBlocksI != nil {
 						reqBuf = &reqBufS{
-							maxCap: t.RetryBlocks.size,
+							maxCap:     t.RetryBlocks.size,
+							allowReuse: true,
 						}
 						reqBuf.data, putBack, err = t.RetryBlocksI.Get()
 						defer putBack()
@@ -542,39 +543,36 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 		reqContentLength string = r.Header.Get("Content-Length")
 		delayBody        io.ReadCloser
 	)
-	if reqBuf != nil && r.Body != nil {
-		if reqContentLength != "" {
-			if n, e := strconv.Atoi(reqContentLength); e == nil && n < reqBuf.maxCap {
-				if e == nil {
-					reqBuf.used = true
-					offset := 0
-					for offset < cap(reqBuf.data) {
-						n, e := r.Body.Read(reqBuf.data[offset:])
-						offset += n
-						if e != nil {
-							if !errors.Is(e, io.EOF) {
-								logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
-								w.WriteHeader(http.StatusBadRequest)
-								return nil
-							}
-							reqBuf.allReaded = true
-							reqBuf.allowReuse = true
-							break
-						} else if n == 0 {
-							break
+	if reqBuf != nil {
+		if r.Body != nil && reqContentLength != "" {
+			if n, e := strconv.Atoi(reqContentLength); e != nil {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
+			} else if n > reqBuf.maxCap {
+				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", ErrReqReBodyOverflow))
+			} else {
+				reqBuf.used = true
+				offset := 0
+				for offset < cap(reqBuf.data) {
+					n, e := r.Body.Read(reqBuf.data[offset:])
+					offset += n
+					if e != nil {
+						if !errors.Is(e, io.EOF) {
+							logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
+							w.WriteHeader(http.StatusBadRequest)
+							return nil
 						}
+						break
+					} else if n == 0 {
+						break
 					}
-					reqBuf.data = reqBuf.data[:offset]
-					if !reqBuf.allReaded {
-						delayBody = r.Body
-						logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", ErrReqReBodyFull))
-					}
-				} else {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", ErrReqReBodyOverflow))
+				}
+				reqBuf.data = reqBuf.data[:offset]
+				if !reqBuf.allReaded {
+					reqBuf.allowReuse = false
+					delayBody = r.Body
+					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", ErrReqReBodyFull))
 				}
 			}
-		} else {
-			reqBuf.allowReuse = true
 		}
 	}
 
