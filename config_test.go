@@ -444,12 +444,12 @@ func Test_Uri(t *testing.T) {
 	}); e != nil {
 		r.Response(func(r *http.Response) error {
 			if r.StatusCode != http.StatusForbidden {
-				t.Fail()
+				t.Fatal()
 			}
 			return nil
 		})
 	} else {
-		t.Fail()
+		t.Fatal()
 	}
 
 	customFiliter.ReqUri.AccessRule = "{go}"
@@ -457,7 +457,7 @@ func Test_Uri(t *testing.T) {
 	if e := r.Reqf(reqf.Rval{
 		Url: "http://127.0.0.1:19000/config_test.go",
 	}); e != nil {
-		t.Fail()
+		t.Fatal()
 	}
 }
 
@@ -684,6 +684,70 @@ func Test_Retry(t *testing.T) {
 						To:     "://127.0.0.1:19001",
 						Weight: 1,
 					},
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19002",
+						Weight: 1,
+					},
+				},
+			},
+		},
+	}
+
+	go conf.Run(ctx, logger)()
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/",
+		// PostStr: "1",
+	}); e != nil {
+		t.Fatal()
+	}
+}
+
+func Test_Retry2(t *testing.T) {
+	ctx := t.Context()
+
+	pweb.New(&http.Server{
+		Addr: "127.0.0.1:19002",
+	}).Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/`: func(w http.ResponseWriter, r *http.Request) {
+			io.Copy(w, r.Body)
+		},
+	})
+
+	conf := &Config{
+		RetryBlocks: Blocks{
+			Num:  10,
+			Size: "3B",
+		},
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Name: "1",
+				Path: []string{"/"},
+				Setting: Setting{
+					PathAdd: true,
+				},
+				RollRule: "order",
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+					},
+				},
+			},
+			{
+				Name: "2",
+				Path: []string{"/"},
+				Setting: Setting{
+					PathAdd: true,
+				},
+				RollRule: "order",
+				Backs: []Back{
 					{
 						Name:   "1",
 						To:     "://127.0.0.1:19002",

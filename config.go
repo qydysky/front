@@ -216,6 +216,14 @@ func (t *Config) startServer(logger Logger, conf *http.Server) (shutdown func(ct
 	}
 }
 
+type reqBufS struct {
+	data       []byte
+	maxCap     int
+	allowReuse bool
+	used       bool
+	allReaded  bool
+}
+
 func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 	// add new route
 	for k := 0; k < len(t.Routes); k++ {
@@ -243,15 +251,42 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 				}
 
 				if pather, ok := t.routeMap.Load(routePath); ok {
-					for v := range pather.Range() {
-						switch v.WR(reqId, routePath, logger, w, r) {
-						case nil:
-							return
-						case ErrCheckFail, ErrNoRoute:
-						default:
+
+					var (
+						reqBuf  *reqBufS
+						putBack = func() {}
+						err     error
+					)
+					if t.RetryBlocksI != nil {
+						reqBuf = &reqBufS{
+							maxCap: t.RetryBlocks.size,
+						}
+						reqBuf.data, putBack, err = t.RetryBlocksI.Get()
+						defer putBack()
+						if err != nil {
+							reqBuf = nil
 						}
 					}
-					w.WriteHeader(http.StatusNotFound)
+
+					for v := range pather.Range() {
+						err = v.WR(reqId, routePath, logger, reqBuf, w, r)
+						if err == nil {
+							break
+						}
+						if reqBuf != nil && !reqBuf.allowReuse {
+							break
+						}
+					}
+					switch err {
+					case nil:
+						return
+					case ErrNoRoute:
+						w.WriteHeader(http.StatusNotFound)
+					case ErrHeaderCheckFail, ErrBodyCheckFail, ErrCheckFail, ErrNoRoute:
+						w.WriteHeader(http.StatusForbidden)
+					default:
+						w.WriteHeader(http.StatusNotFound)
+					}
 				}
 			})
 		}
@@ -387,7 +422,7 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	return backLink
 }
 
-func (t *Route) WR(reqId uint32, routePath string, logger Logger, w http.ResponseWriter, r *http.Request) error {
+func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBufS, w http.ResponseWriter, r *http.Request) (err error) {
 	var (
 		logFormat         = "%d %v %v%v > %v %v %v"
 		logFormatWithName = "%v %v %v%v > %v > %v %v %v"
@@ -498,49 +533,39 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, w http.Respons
 		}
 	}
 
-	var e error = ErrAllBacksFail
-
 	type reqDealer interface {
 		Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
 	}
 
 	// repack
 	var (
-		reqBuf           []byte
-		reqBufUsed       bool
-		reqAllRead       bool
 		reqContentLength string = r.Header.Get("Content-Length")
 		delayBody        io.ReadCloser
 	)
-	if t.config.RetryBlocksI != nil && r.Body != nil {
+	if reqBuf != nil && r.Body != nil {
 		if reqContentLength != "" {
-			if n, e := strconv.Atoi(reqContentLength); e == nil && n < t.config.RetryBlocks.size {
-				var putBack func()
-				var e error
-				reqBuf, putBack, e = t.config.RetryBlocksI.Get()
+			if n, e := strconv.Atoi(reqContentLength); e == nil && n < reqBuf.maxCap {
 				if e == nil {
-					defer putBack()
-					reqBufUsed = true
-
+					reqBuf.used = true
 					offset := 0
-					for offset < cap(reqBuf) {
-						n, e := r.Body.Read(reqBuf[offset:])
+					for offset < cap(reqBuf.data) {
+						n, e := r.Body.Read(reqBuf.data[offset:])
 						offset += n
 						if e != nil {
 							if !errors.Is(e, io.EOF) {
 								logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
-								// w.Header().Add(header+"Error", ErrNoRoute.Error())
 								w.WriteHeader(http.StatusBadRequest)
 								return nil
 							}
-							reqAllRead = true
+							reqBuf.allReaded = true
+							reqBuf.allowReuse = true
 							break
 						} else if n == 0 {
 							break
 						}
 					}
-					reqBuf = reqBuf[:offset]
-					if !reqAllRead {
+					reqBuf.data = reqBuf.data[:offset]
+					if !reqBuf.allReaded {
 						delayBody = r.Body
 						logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", ErrReqReBodyFull))
 					}
@@ -548,6 +573,8 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, w http.Respons
 					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", ErrReqReBodyOverflow))
 				}
 			}
+		} else {
+			reqBuf.allowReuse = true
 		}
 	}
 
@@ -561,64 +588,51 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, w http.Respons
 		pslice.LoopAddFront(&backP.LastChosenT, &now)
 		backP.lock.Unlock()
 
-		if reqBufUsed {
-			if !reqAllRead {
+		if reqBuf != nil && reqBuf.used {
+			if !reqBuf.allReaded {
 				r.Body = pio.RWC{
-					R: io.MultiReader(bytes.NewBuffer(reqBuf), delayBody).Read,
+					R: io.MultiReader(bytes.NewBuffer(reqBuf.data), delayBody).Read,
 					C: delayBody.Close,
 				}
-				reqBufUsed = false
 			} else {
-				r.Body = io.NopCloser(bytes.NewBuffer(reqBuf))
+				r.Body = io.NopCloser(bytes.NewBuffer(reqBuf.data))
 			}
 		}
 
 		if backP.To == "" {
-			e = component2.GetV3[reqDealer]("echo").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+			err = component2.GetV3[reqDealer]("echo").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
 		} else if !strings.Contains(backP.To, "://") {
-			e = component2.GetV3[reqDealer]("local").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+			err = component2.GetV3[reqDealer]("local").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
 		} else if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
-			e = component2.GetV3[reqDealer]("ws").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+			err = component2.GetV3[reqDealer]("ws").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
 		} else {
-			e = component2.GetV3[reqDealer]("http").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+			err = component2.GetV3[reqDealer]("http").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
 		}
 
-		if e == nil {
+		if err == nil {
 			// no err
 			break
 		}
 
-		if errors.Is(e, context.Canceled) {
-			e = nil
+		if errors.Is(err, context.Canceled) {
 			break
 		}
 
-		if v, ok := e.(ErrCanRetry); !ok || !v.CanRetry {
+		if v, ok := err.(ErrCanRetry); !ok || !v.CanRetry {
 			// some err can't retry
 			break
-		} else if reqContentLength != "" && !reqBufUsed {
+		} else if reqContentLength != "" && reqBuf != nil && !reqBuf.allowReuse {
 			// has body but buf no allow reuse
 			break
 		}
 
-		logger.Debug(`T:`, fmt.Sprintf(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backP.Name, "ErrCanRetry", e))
+		logger.Debug(`T:`, fmt.Sprintf(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backP.Name, "ErrCanRetry", err))
 	}
 
-	if e != nil {
-		// w.Header().Add(header+"Error", e.Error())
-		if errors.Is(e, ErrHeaderCheckFail) || errors.Is(e, ErrBodyCheckFail) {
-			w.WriteHeader(http.StatusForbidden)
-		} else {
-			if errors.Is(e, ErrAllBacksFail) {
-				w.WriteHeader(http.StatusBadGateway)
-			} else {
-				t.config.webpath.GetConn(r).Close()
-			}
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
-		}
+	if err != nil {
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", err))
 	}
-
-	return nil
+	return
 }
 
 type Back struct {

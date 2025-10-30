@@ -1,6 +1,6 @@
 # front
 
-这是一个简单的http/https/ws/wss均衡负载、故障转移路由/代理，通过定时刷新配置不中断地：
+这是一个简单的http/https/ws/wss均衡负载、故障转移路由/代理，通过刷新配置不中断地：
 
 - 监听占用等待
 - 动态后端
@@ -107,7 +107,7 @@ config:
     - *size*: string 转发的块大小，默认`16K`
     - *num*: int 转发的块数量，默认`1000`
 - *retryBlocks*: {} 重试, 当停用时，不进行重试。其他情况：1.当所有块都在使用中时，不进行重试。2.当请求没有`Content-Length`时，将会重试。
-    - *size*: string 重试的块大小，默认`1M`
+    - *size*: string 重试的块大小，当请求body超过配置的大小时，将会导致无法继续失败回落，默认`1M`
     - *num*: int 重试的块数量，默认`0`，为`0`时停用重试
 - *tls*: {} 启用tls, 默认空
     - *pub*: string 公钥pem路径，支持从`http`/`https`获取
@@ -146,7 +146,7 @@ setting: setting代指下述各配置
 
 - filiters: []
     
-    当同一个route的back的filiter(reqHost、reqUri、reqHeader)不同时，将会从上至下匹配back，直到首个有效的filiter，并继续匹配并附加同filiter的back
+    请求将从上至下尝试route的back的filiter(reqAddr、reqHost、reqUri、reqHeader)，匹配成功时，附加back到处理序列，序列从上至下进行尝试
 
     filiters中同个{}为和关系，不同{}为或关系
 

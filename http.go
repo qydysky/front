@@ -63,12 +63,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 	setEnvIfNot(env, `$remote_addr`, r.Header.Get("X-Real-IP"))
 	setEnvIfNot(env, `$remote_addr`, strings.Split(r.RemoteAddr, ":")[0])
 
-	// if e :=
 	copyHeader(env, r.Header, req.Header, chosenBack.getDealerReqHeader())
-	// ; e != nil {
-	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, "BLOCK", e, time.Since(opT)))
-	// 	return ErrDealReqHeader
-	// }
 
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 
@@ -146,7 +141,6 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		break
 	}
 	if noPassFiliter {
-		// w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
 		return MarkRetry(ErrHeaderCheckFail)
 	}
 
