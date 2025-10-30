@@ -14,6 +14,8 @@
 - 请求数据过滤
 
 支持嵌入到其他项目中/独立运行
+
+命令行参数：
 ```
 Usage of ./main:
   -adminPath string
@@ -42,7 +44,7 @@ Usage of ./main:
         stop, when adminPort/adminPath set
 ```
 
-示例
+示例：
 ```json
 [
     {
@@ -96,7 +98,13 @@ Last-Modified: Wed, 30 Oct 2024 17:51:23 GMT
 Date: Wed, 30 Oct 2024 17:51:23 GMT
 ```
 
-配置为json数组格式[]，下面为数组中的其中一个{}，下述字段*倾斜*的，表示不会根据配置动态加载
+处理流程：
+
+    请求将从上至下尝试route的filiter(reqAddr、reqHost、reqUri、reqHeader)，匹配成功时，再根据route中back的filiter进行过滤，并按rollRule进行排序，然后逐个尝试，若某个back成功响应，则结束本次请求的处理
+
+配置：
+
+为json数组格式[]，下面为数组中的其中一个{}，下述字段*倾斜*的，表示不会根据配置动态加载
 
 config:
 
@@ -145,10 +153,6 @@ setting: setting代指下述各配置
 - proxy: string 使用proxy进行请求，支持`socks5:\\`，`http:\\`，`https:\\`(仅http、https、ws、wss有效)
 
 - filiters: []
-    
-    请求将从上至下尝试route的filiter(reqAddr、reqHost、reqUri、reqHeader)，匹配成功时，附加back到处理序列
-
-    然后依次尝试序列中back的filiter，直到某个back成功响应
 
     filiters中同个{}为和关系，不同{}为或关系
 
