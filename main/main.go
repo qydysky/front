@@ -148,6 +148,9 @@ func main() {
 			logger.L(`E:`, "配置不存在")
 			return
 		}
+		defer func() {
+			configF.Close()
+		}()
 
 		var (
 			adminCancle = func() {}
@@ -275,7 +278,6 @@ func main() {
 		}
 
 		logger.L(`I:`, "退出中")
-		configF.Close()
 		adminCancle()
 
 		if e := cancle(); errors.Is(e, pctx.ErrWaitTo) {

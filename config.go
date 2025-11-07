@@ -505,28 +505,24 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 
 		backIs = addIfNotExsit(backIs, backEqual, t.FiliterBackByRequest(r)...)
 
-		unlock := BatchRLock(backIs[splicingC:])
 		if f, ok := rollRuleMap[t.RollRule]; ok {
 			f(backIs[splicingC:])
 		} else {
 			rand_Shuffle(backIs[splicingC:])
 		}
-		unlock()
 	}
 
 	if len(backIs) == 0 {
 		return ErrNoRoute
 	} else {
-		needUp := 0
-		unlock := BatchRLock(backIs)
-		for i := 0; i < len(backIs) && needUp >= 0; i++ {
-			if backIs[i].IsLive() {
+		var needUp int
+		for i, back := range BatchRLock(backIs) {
+			if back.IsLive() {
 				needUp = -1
-			} else if backIs[needUp].DisableC > backIs[i].DisableC {
+			} else if backIs[needUp].DisableC > back.DisableC {
 				needUp = i
 			}
 		}
-		unlock()
 		if needUp >= 0 && t.AlwaysUp {
 			logger.Warn(`W:`, fmt.Sprintf(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backIs[needUp].Name, "Err", ErrReUp))
 			backIs[needUp].Enable()
@@ -582,10 +578,7 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 			continue
 		}
 
-		now := time.Now()
-		backP.lock.Lock()
-		pslice.LoopAddFront(&backP.LastChosenT, &now)
-		backP.lock.Unlock()
+		backP.chosen()
 
 		if reqBuf != nil && reqBuf.used {
 			if !reqBuf.allReaded {
@@ -653,12 +646,11 @@ type Back struct {
 	Setting
 }
 
-func BatchRLock(backs []*Back) (unlock func()) {
-	for _, v := range backs {
-		v.lock.RLock()
-	}
-	return func() {
-		for _, v := range backs {
+func BatchRLock(backs []*Back) iter.Seq2[int, *Back] {
+	return func(yield func(int, *Back) bool) {
+		for k, v := range backs {
+			v.lock.RLock()
+			yield(k, v)
 			v.lock.RUnlock()
 		}
 	}
@@ -851,6 +843,13 @@ func (t *Back) be(opT time.Time) {
 func (t *Back) ed() {
 	t.lock.Lock()
 	t.DealingC -= 1
+	t.lock.Unlock()
+}
+
+func (t *Back) chosen() {
+	t.lock.Lock()
+	copy(t.LastChosenT, t.LastChosenT[1:])
+	t.LastChosenT[0] = time.Now()
 	t.lock.Unlock()
 }
 

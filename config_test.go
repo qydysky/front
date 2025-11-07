@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -178,6 +179,52 @@ func Test_Uri5(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+func Test_Uri7(t *testing.T) {
+	ctx := t.Context()
+
+	j := []byte(`
+	{
+		"addr": "127.0.0.1:19000",
+		"routes": [
+			{
+				"path": ["/test/"],
+				"pathAdd": true,
+				"name": "1",
+				"backs": [
+					{
+						"name": "1"
+					}
+				]
+			}
+		]
+	}
+	`)
+
+	conf := &Config{}
+	if e := json.Unmarshal(j, conf); e != nil {
+		t.Fatal(e)
+	}
+
+	go conf.Run(ctx, logger)()
+
+	time.Sleep(time.Second)
+
+	var wg sync.WaitGroup
+	wg.Add(1000)
+	for i := 0; i < 1000; i++ {
+		go func() {
+			if e := reqf.New().Reqf(reqf.Rval{
+				Ctx: ctx,
+				Url: "http://127.0.0.1:19000/test/1",
+			}); e != nil {
+				t.Fatal(e)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 }
 
 func Test_Uri4(t *testing.T) {
