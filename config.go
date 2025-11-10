@@ -415,7 +415,6 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 			continue
 		}
 
-		t.Backs[i].route = t
 		backLink = append(backLink, &t.Backs[i])
 	}
 
@@ -515,12 +514,21 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 	if len(backIs) == 0 {
 		return ErrNoRoute
 	} else {
-		var needUp int
-		for i, back := range BatchRLock(backIs) {
-			if back.IsLive() {
+		var (
+			needUp   int
+			disableC uint
+		)
+
+		for i := 0; i < len(backIs); i++ {
+			if backIs[i].IsLive() {
 				needUp = -1
-			} else if backIs[needUp].DisableC > back.DisableC {
-				needUp = i
+			} else {
+				ul := backIs[needUp].lock.RLock()
+				if c := backIs[needUp].DisableC; disableC == 0 || disableC > c {
+					disableC = c
+					needUp = i
+				}
+				ul()
 			}
 		}
 		if needUp >= 0 && t.AlwaysUp {
@@ -628,14 +636,14 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 }
 
 type Back struct {
-	route       *Route       `json:"-"`
-	lock        sync.RWMutex `json:"-"`
-	UpT         time.Time    `json:"upT"`
-	LastChosenT []time.Time  `json:"lastChosenT"`
-	LastFailT   []time.Time  `json:"lastFailT"`
-	DisableC    uint         `json:"disableC"`
-	DealingC    uint         `json:"dealingC"`
-	ChosenC     uint         `json:"chosenC"`
+	route       *Route        `json:"-"`
+	lock        psync.RWMutex `json:"-"`
+	UpT         time.Time     `json:"upT"`
+	LastChosenT time.Time     `json:"lastChosenT"`
+	LastFailT   time.Time     `json:"lastFailT"`
+	DisableC    uint          `json:"disableC"`
+	DealingC    uint          `json:"dealingC"`
+	ChosenC     uint          `json:"chosenC"`
 
 	lastResDru time.Duration `json:"-"`
 
@@ -648,10 +656,14 @@ type Back struct {
 
 func BatchRLock(backs []*Back) iter.Seq2[int, *Back] {
 	return func(yield func(int, *Back) bool) {
+		var stop bool
 		for k, v := range backs {
-			v.lock.RLock()
-			yield(k, v)
-			v.lock.RUnlock()
+			ul := v.lock.RLock()
+			stop = !yield(k, v)
+			ul()
+			if stop {
+				break
+			}
 		}
 	}
 }
@@ -666,12 +678,6 @@ func (t *Back) SwapSign(logger Logger) {
 		t.verifyPeerCer = nil
 	} else {
 		t.verifyPeerCer, t.verifyPeerCerErr = os.ReadFile(path)
-	}
-	if len(t.LastChosenT) == 0 {
-		t.LastChosenT = make([]time.Time, 10)
-	}
-	if len(t.LastFailT) == 0 {
-		t.LastFailT = make([]time.Time, 10)
 	}
 }
 
@@ -833,46 +839,39 @@ func (t *Back) Id() string {
 }
 
 func (t *Back) be(opT time.Time) {
-	t.lock.Lock()
+	defer t.lock.Lock()()
 	t.ChosenC += 1
 	t.lastResDru = time.Since(opT)
 	t.DealingC += 1
-	t.lock.Unlock()
 }
 
 func (t *Back) ed() {
-	t.lock.Lock()
+	defer t.lock.Lock()()
 	t.DealingC -= 1
-	t.lock.Unlock()
 }
 
 func (t *Back) chosen() {
-	t.lock.Lock()
-	copy(t.LastChosenT, t.LastChosenT[1:])
-	t.LastChosenT[0] = time.Now()
-	t.lock.Unlock()
+	defer t.lock.Lock()()
+	t.LastChosenT = time.Now()
 }
 
 func (t *Back) IsLive() bool {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	defer t.lock.RLock()()
 	return t.UpT.Before(time.Now())
 }
 
 func (t *Back) Disable() {
 	now := time.Now()
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	defer t.lock.RLock()()
 	t.DisableC += 1
-	pslice.LoopAddFront(&t.LastFailT, &now)
+	t.LastFailT = now
 	if tmp := t.getErrBanSec(); tmp > 0 {
 		t.UpT = now.Add(time.Second * time.Duration(tmp))
 	}
 }
 
 func (t *Back) Enable() {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	defer t.lock.Lock()()
 	t.UpT = time.Now()
 }
 

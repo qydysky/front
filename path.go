@@ -75,15 +75,13 @@ func (t *Pather) Range() iter.Seq[*Route] {
 		tmp := t
 		for {
 			ul := tmp.l.RLock()
-			if tmp.Dealer != nil && !yield(tmp.Dealer) {
-				ul()
+			route := tmp.Dealer
+			tmp = tmp.Next
+			ul()
+			if route != nil && !yield(route) {
 				return
-			} else if tmp.Next == nil {
-				ul()
+			} else if tmp == nil {
 				return
-			} else {
-				tmp = tmp.Next
-				ul()
 			}
 		}
 	}
