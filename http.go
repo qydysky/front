@@ -22,6 +22,7 @@ import (
 	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
 	pio "github.com/qydysky/part/io"
+	pool "github.com/qydysky/part/pool"
 	pslice "github.com/qydysky/part/slice"
 )
 
@@ -35,6 +36,12 @@ func init() {
 }
 
 type httpDealer struct{}
+
+var transportPool = pool.New(pool.PoolFunc[http.Transport]{
+	New: func() *http.Transport {
+		return http.DefaultTransport.(*http.Transport).Clone()
+	},
+}, -1)
 
 func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
 	var (
@@ -65,7 +72,8 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	copyHeader(env, r.Header, req.Header, chosenBack.getDealerReqHeader())
 
-	customTransport := http.DefaultTransport.(*http.Transport).Clone()
+	customTransport := transportPool.Get()
+	defer transportPool.Put(customTransport)
 
 	customTransport.TLSClientConfig = &tls.Config{
 		InsecureSkipVerify: chosenBack.getInsecureSkipVerify(),
