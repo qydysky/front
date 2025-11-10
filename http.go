@@ -37,9 +37,14 @@ func init() {
 
 type httpDealer struct{}
 
-var transportPool = pool.New(pool.PoolFunc[http.Transport]{
-	New: func() *http.Transport {
-		return http.DefaultTransport.(*http.Transport).Clone()
+var clientPool = pool.New(pool.PoolFunc[http.Client]{
+	New: func() *http.Client {
+		return &http.Client{
+			Transport: http.DefaultTransport.(*http.Transport).Clone(),
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return ErrRedirect
+			},
+		}
 	},
 }, -1)
 
@@ -72,15 +77,15 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	copyHeader(env, r.Header, req.Header, chosenBack.getDealerReqHeader())
 
-	customTransport := transportPool.Get()
-	defer transportPool.Put(customTransport)
+	client := clientPool.Get()
+	defer clientPool.Put(client)
 
-	customTransport.TLSClientConfig = &tls.Config{
+	client.Transport.(*http.Transport).TLSClientConfig = &tls.Config{
 		InsecureSkipVerify: chosenBack.getInsecureSkipVerify(),
 	}
 
 	if chosenBack.getProxy() != "" {
-		customTransport.Proxy = func(_ *http.Request) (*netUrl.URL, error) {
+		client.Transport.(*http.Transport).Proxy = func(_ *http.Request) (*netUrl.URL, error) {
 			return netUrl.Parse(chosenBack.getProxy())
 		}
 	}
@@ -88,8 +93,8 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 	if cer, err := chosenBack.getVerifyPeerCer(); err == nil {
 		pool := x509.NewCertPool()
 		if pool.AppendCertsFromPEM(cer) {
-			customTransport.TLSClientConfig.InsecureSkipVerify = true
-			customTransport.TLSClientConfig.VerifyPeerCertificate = func(rawCerts [][]byte, _ [][]*x509.Certificate) (e error) {
+			client.Transport.(*http.Transport).TLSClientConfig.InsecureSkipVerify = true
+			client.Transport.(*http.Transport).TLSClientConfig.VerifyPeerCertificate = func(rawCerts [][]byte, _ [][]*x509.Certificate) (e error) {
 				if len(rawCerts) == 0 {
 					return ErrCerVerify
 				}
@@ -105,13 +110,6 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		}
 	} else if err != ErrEmptyVerifyPeerCerByte {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, err, time.Since(opT)))
-	}
-
-	client := http.Client{
-		Transport: customTransport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return ErrRedirect
-		},
 	}
 
 	resp, e = client.Do(req)
