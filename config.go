@@ -520,16 +520,14 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 		)
 
 		for i := 0; i < len(backIs); i++ {
-			if backIs[i].IsLive() {
+			ul := backIs[needUp].lock.RLock()
+			if backIs[i].UpT.Before(time.Now()) {
 				needUp = -1
-			} else {
-				ul := backIs[needUp].lock.RLock()
-				if c := backIs[needUp].DisableC; disableC == 0 || disableC > c {
-					disableC = c
-					needUp = i
-				}
-				ul()
+			} else if c := backIs[needUp].DisableC; disableC == 0 || disableC > c {
+				disableC = c
+				needUp = i
 			}
+			ul()
 		}
 		if needUp >= 0 && t.AlwaysUp {
 			logger.Warn(`W:`, fmt.Sprintf(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backIs[needUp].Name, "Err", ErrReUp))
