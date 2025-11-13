@@ -519,13 +519,15 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 			disableC uint
 		)
 
-		for i := 0; i < len(backIs); i++ {
-			ul := backIs[needUp].lock.RLock()
+		for i := 0; needUp != -1 && i < len(backIs); i++ {
+			ul := backIs[i].lock.RLock()
 			if backIs[i].UpT.Before(time.Now()) {
 				needUp = -1
-			} else if c := backIs[needUp].DisableC; disableC == 0 || disableC > c {
-				disableC = c
-				needUp = i
+			} else {
+				if c := backIs[i].DisableC; disableC == 0 || disableC > c {
+					disableC = c
+					needUp = i
+				}
 			}
 			ul()
 		}
