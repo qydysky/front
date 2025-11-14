@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -184,9 +185,24 @@ func Test_Uri5(t *testing.T) {
 func Test_Uri7(t *testing.T) {
 	ctx := t.Context()
 
+	var once atomic.Bool
+	web := pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	})
+	web.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/test/`: func(w http.ResponseWriter, r *http.Request) {
+			if once.CompareAndSwap(false, true) {
+				time.Sleep(time.Second * 10)
+			}
+			io.Copy(w, r.Body)
+		},
+	})
+
+	defer web.Shutdown()
+
 	j := []byte(`
 	{
-		"addr": "127.0.0.1:19000",
+		"addr": "127.0.0.1:19002",
 		"routes": [
 			{
 				"path": ["/test/"],
@@ -194,7 +210,8 @@ func Test_Uri7(t *testing.T) {
 				"name": "1",
 				"backs": [
 					{
-						"name": "1"
+						"name": "1",
+						"to": "://127.0.0.1:19001"
 					}
 				]
 			}
@@ -212,12 +229,13 @@ func Test_Uri7(t *testing.T) {
 	time.Sleep(time.Second)
 
 	var wg sync.WaitGroup
-	wg.Add(1000)
-	for i := 0; i < 1000; i++ {
+	wg.Add(100)
+	for range 100 {
 		go func() {
 			if e := reqf.New().Reqf(reqf.Rval{
-				Ctx: ctx,
-				Url: "http://127.0.0.1:19000/test/1",
+				Ctx:     ctx,
+				Url:     "http://127.0.0.1:19002/test/",
+				PostStr: "unitofmeas=EA&partdescr=PACKING&qtyreceived=21&originalSerialNo=0081027865&syncId=20251113112344&serialno=M00005&expiryDate=2031-03-31&soDtlId=9892095&pOno=225026385&receiptUser=014437 张邦宇&primaryLocation=NRC06&mroRevId=1988809975137153024&createdUser=014437 张邦宇&waybillno=176-19009196&commentNode=mroBackRun&partno=MS28775-130&owner=GAMECO&orderNo=&certificateType2=BN&alternatePartno=MS28775-130&certificateType1=COC&certificateNum2=0081027865&certificateNum1=1&warehouse=03&apeAddr=http://10.240.3.52:8080/apeme/&conditionCode=&widId=1988809975137153024&linenoAlt=001&qty=21&isExpiryDate=Y&location=NRC06&labelqty=1&isLot=0&operation=PO收货&",
 			}); e != nil {
 				t.Fatal(e)
 			}
@@ -1123,5 +1141,54 @@ func Test_Filiter(t *testing.T) {
 		t.Fatal(e)
 	} else if r.ResStatusCode() != 202 {
 		t.Fatal()
+	}
+}
+
+func Test_TO(t *testing.T) {
+	ctx := t.Context()
+
+	w1 := pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	})
+	defer w1.Shutdown()
+	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/`: func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(3 * time.Second)
+		},
+	})
+
+	conf := &Config{
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path:     []string{"/"},
+				RollRule: "order",
+				AlwaysUp: true,
+				Setting: Setting{
+					CtxTOSec: 1,
+					PathAdd:  true,
+				},
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+					},
+				},
+			},
+		},
+	}
+
+	go conf.Run(ctx, logger)()
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/",
+	}); e != nil {
+		if r.ResStatusCode() != http.StatusGatewayTimeout {
+			t.Fatal(e)
+		}
 	}
 }

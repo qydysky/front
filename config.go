@@ -281,8 +281,8 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					switch err {
 					case nil:
 						return
-					case ErrNoRoute:
-						w.WriteHeader(http.StatusNotFound)
+					case context.Canceled:
+						w.WriteHeader(http.StatusGatewayTimeout)
 					case ErrHeaderCheckFail, ErrBodyCheckFail, ErrCheckFail, ErrNoRoute:
 						w.WriteHeader(http.StatusForbidden)
 					default:
@@ -599,15 +599,26 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 			}
 		}
 
-		if backP.To == "" {
-			err = component2.GetV3[reqDealer]("echo").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
-		} else if !strings.Contains(backP.To, "://") {
-			err = component2.GetV3[reqDealer]("local").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
-		} else if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
-			err = component2.GetV3[reqDealer]("ws").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
-		} else {
-			err = component2.GetV3[reqDealer]("http").Inter().Deal(r.Context(), reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+		var (
+			ctx    context.Context    = r.Context()
+			cancle context.CancelFunc = func() {}
+		)
+
+		if backP.getCtxTOSec() > 0 {
+			ctx, cancle = context.WithTimeout(ctx, time.Second*time.Duration(backP.getCtxTOSec()))
 		}
+
+		if backP.To == "" {
+			err = component2.GetV3[reqDealer]("echo").Inter().Deal(ctx, reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+		} else if !strings.Contains(backP.To, "://") {
+			err = component2.GetV3[reqDealer]("local").Inter().Deal(ctx, reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+		} else if strings.ToLower((r.Header.Get("Upgrade"))) == "websocket" {
+			err = component2.GetV3[reqDealer]("ws").Inter().Deal(ctx, reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+		} else {
+			err = component2.GetV3[reqDealer]("http").Inter().Deal(ctx, reqId, w, r, routePath, backP, logger, t.config.BlocksI)
+		}
+
+		cancle()
 
 		if err == nil {
 			// no err
@@ -708,6 +719,13 @@ func (t *Back) getErrToSec() float64 {
 		return t.route.ErrToSec
 	} else {
 		return t.ErrToSec
+	}
+}
+func (t *Back) getCtxTOSec() float64 {
+	if t.CtxTOSec == 0 {
+		return t.route.CtxTOSec
+	} else {
+		return t.CtxTOSec
 	}
 }
 func (t *Back) getInsecureSkipVerify() bool {
@@ -877,6 +895,7 @@ func (t *Back) Enable() {
 
 type Setting struct {
 	PathAdd            bool               `json:"pathAdd"`
+	CtxTOSec           float64            `json:"ctxTOSec"`
 	ErrToSec           float64            `json:"errToSec"`
 	Splicing           int                `json:"splicing"`
 	ErrBanSec          int                `json:"errBanSec"`

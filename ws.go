@@ -75,7 +75,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 
 	var e error
 	conn, resp, e = DialContext(ctx, url, reqHeader, chosenBack)
-	if e != nil && !errors.Is(e, context.Canceled) {
+	if e != nil && !errors.Is(e, context.Canceled) && !errors.Is(e, context.Canceled) && !errors.Is(e, context.DeadlineExceeded) {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
 		chosenBack.Disable()
 		return MarkRetry(ErrResFail)
@@ -87,7 +87,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 	}
 	// }
 
-	if pctx.Done(r.Context()) {
+	if pctx.Done(ctx) || pctx.Done(r.Context()) {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, context.Canceled, time.Since(opT)))
 		return context.Canceled
 	}

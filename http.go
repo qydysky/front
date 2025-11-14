@@ -113,7 +113,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 	}
 
 	resp, e = client.Do(req)
-	if e != nil && !errors.Is(e, ErrRedirect) && !errors.Is(e, context.Canceled) {
+	if e != nil && !errors.Is(e, ErrRedirect) && !errors.Is(e, context.Canceled) && !errors.Is(e, context.DeadlineExceeded) {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
 		chosenBack.Disable()
 		return MarkRetry(ErrResFail)
@@ -124,7 +124,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		chosenBack.Disable()
 	}
 
-	if pctx.Done(r.Context()) {
+	if pctx.Done(ctx) || pctx.Done(r.Context()) {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.Canceled, time.Since(opT)))
 		return context.Canceled
 	}
