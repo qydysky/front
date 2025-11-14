@@ -1169,7 +1169,7 @@ func Test_TO(t *testing.T) {
 				RollRule: "order",
 				AlwaysUp: true,
 				Setting: Setting{
-					CtxTOSec: 1,
+					CtxToSec: 1,
 					PathAdd:  true,
 				},
 				Backs: []Back{

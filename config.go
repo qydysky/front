@@ -604,8 +604,8 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 			cancle context.CancelFunc = func() {}
 		)
 
-		if backP.getCtxTOSec() > 0 {
-			ctx, cancle = context.WithTimeout(ctx, time.Second*time.Duration(backP.getCtxTOSec()))
+		if backP.getCtxToSec() > 0 {
+			ctx, cancle = context.WithTimeout(ctx, time.Second*time.Duration(backP.getCtxToSec()))
 		}
 
 		if backP.To == "" {
@@ -721,11 +721,11 @@ func (t *Back) getErrToSec() float64 {
 		return t.ErrToSec
 	}
 }
-func (t *Back) getCtxTOSec() float64 {
-	if t.CtxTOSec == 0 {
-		return t.route.CtxTOSec
+func (t *Back) getCtxToSec() float64 {
+	if t.CtxToSec == 0 {
+		return t.route.CtxToSec
 	} else {
-		return t.CtxTOSec
+		return t.CtxToSec
 	}
 }
 func (t *Back) getInsecureSkipVerify() bool {
@@ -895,7 +895,7 @@ func (t *Back) Enable() {
 
 type Setting struct {
 	PathAdd            bool               `json:"pathAdd"`
-	CtxTOSec           float64            `json:"ctxTOSec"`
+	CtxToSec           float64            `json:"ctxTOSec"`
 	ErrToSec           float64            `json:"errToSec"`
 	Splicing           int                `json:"splicing"`
 	ErrBanSec          int                `json:"errBanSec"`
