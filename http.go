@@ -89,7 +89,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 			return netUrl.Parse(chosenBack.getProxy())
 		}
 	}
-
+	
 	if cer, err := chosenBack.getVerifyPeerCer(); err == nil {
 		pool := x509.NewCertPool()
 		if pool.AppendCertsFromPEM(cer) {
@@ -126,6 +126,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	if pctx.Done(ctx) || pctx.Done(r.Context()) {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.Canceled, time.Since(opT)))
+		chosenBack.Disable()
 		return context.Canceled
 	}
 

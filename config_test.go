@@ -1152,8 +1152,12 @@ func Test_TO(t *testing.T) {
 	})
 	defer w1.Shutdown()
 	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
-		`/`: func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(3 * time.Second)
+		`/1`: func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(2 * time.Second)
+		},
+		`/2`: func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte{'1'})
+			time.Sleep(2 * time.Second)
 		},
 	})
 
@@ -1185,7 +1189,14 @@ func Test_TO(t *testing.T) {
 
 	r := reqf.New()
 	if e := r.Reqf(reqf.Rval{
-		Url: "http://127.0.0.1:19000/",
+		Url: "http://127.0.0.1:19000/1",
+	}); e != nil {
+		if r.ResStatusCode() != http.StatusGatewayTimeout {
+			t.Fatal(e)
+		}
+	}
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/2",
 	}); e != nil {
 		if r.ResStatusCode() != http.StatusGatewayTimeout {
 			t.Fatal(e)

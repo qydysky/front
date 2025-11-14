@@ -89,6 +89,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 
 	if pctx.Done(ctx) || pctx.Done(r.Context()) {
 		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, context.Canceled, time.Since(opT)))
+		chosenBack.Disable()
 		return context.Canceled
 	}
 
