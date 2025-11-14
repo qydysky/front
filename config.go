@@ -895,7 +895,7 @@ func (t *Back) Enable() {
 
 type Setting struct {
 	PathAdd            bool               `json:"pathAdd"`
-	CtxToSec           float64            `json:"ctxTOSec"`
+	CtxToSec           float64            `json:"ctxToSec"`
 	ErrToSec           float64            `json:"errToSec"`
 	Splicing           int                `json:"splicing"`
 	ErrBanSec          int                `json:"errBanSec"`
