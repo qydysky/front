@@ -10,7 +10,6 @@ import (
 	"io"
 	"iter"
 	"math"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -64,13 +63,14 @@ type Blocks struct {
 	Num  int    `json:"num,omitempty"`
 }
 
-func (t *Config) Run(ctx context.Context, logger Logger) (run func()) {
+// Run会创建协程，启动服务，并阻塞直到rootCtx.Done，rootCtx.Done之后，
+func (t *Config) Run(rootCtx context.Context, logger Logger) {
 
-	ctx, done := pctx.WithWait(ctx, 0, time.Minute)
+	ctx, done := pctx.WithWait(context.Background(), 0, time.Minute)
 
 	httpSer := http.Server{
-		Addr:        t.Addr,
-		BaseContext: func(l net.Listener) context.Context { return ctx },
+		Addr: t.Addr,
+		// BaseContext: func(l net.Listener) context.Context { return ctx },
 	}
 	if t.TLS.Key != "" && t.TLS.Pub != "" {
 		var (
@@ -173,20 +173,19 @@ func (t *Config) Run(ctx context.Context, logger Logger) (run func()) {
 
 	t.SwapSign(ctx, logger)
 
-	return func() {
-		shutdownf := t.startServer(logger, &httpSer)
-		logger.Info(`I:`, fmt.Sprintf("%v running", t.Addr))
-		<-ctx.Done()
-		shutdownf()
-		logger.Info(`I:`, fmt.Sprintf("%v shutdown", t.Addr))
-		_ = done()
-	}
+	shutdownf := t.startServer(logger, &httpSer, time.Millisecond*100)
+	logger.Info(`I:`, fmt.Sprintf("%v running", t.Addr))
+
+	<-rootCtx.Done()
+	shutdownf()
+	_ = done()
+	logger.Info(`I:`, fmt.Sprintf("%v shutdown", t.Addr))
 }
 
-func (t *Config) startServer(logger Logger, conf *http.Server) (shutdown func(ctx ...context.Context)) {
+func (t *Config) startServer(logger Logger, conf *http.Server, retryDur time.Duration) (shutdown func(ctx ...context.Context)) {
 	shutdown = func(ctx ...context.Context) {}
 
-	timer := time.NewTicker(time.Millisecond * 100)
+	timer := time.NewTicker(retryDur)
 	defer timer.Stop()
 
 	var matchFunc func(path string) (func(w http.ResponseWriter, r *http.Request), bool)
@@ -252,7 +251,6 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 				}
 
 				if pather, ok := t.routeMap.Load(routePath); ok {
-
 					var (
 						reqBuf  *reqBufS
 						putBack = func() {}
@@ -269,6 +267,9 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 							reqBuf = nil
 						}
 					}
+
+					_, done1 := pctx.WaitCtx(ctx)
+					defer done1()
 
 					for v := range pather.Range() {
 						err = v.WR(reqId, routePath, logger, reqBuf, w, r)
@@ -289,6 +290,8 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 					default:
 						w.WriteHeader(http.StatusNotFound)
 					}
+				} else {
+					w.WriteHeader(http.StatusNotFound)
 				}
 			})
 		}

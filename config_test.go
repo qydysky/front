@@ -2,7 +2,9 @@ package front
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -104,7 +106,7 @@ func Test_Uri6(t *testing.T) {
 		t.Fatal(e)
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -164,7 +166,7 @@ func Test_Uri5(t *testing.T) {
 		t.Fatal(e)
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -224,7 +226,7 @@ func Test_Uri7(t *testing.T) {
 		t.Fatal(e)
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -294,7 +296,7 @@ func Test_Uri4(t *testing.T) {
 		t.Fatal(e)
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -373,7 +375,7 @@ func Test_Uri3(t *testing.T) {
 		t.Fatal(e)
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -437,7 +439,7 @@ func Test_Uri2(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -493,7 +495,7 @@ func Test_Uri(t *testing.T) {
 			},
 		},
 	}
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 	time.Sleep(time.Second)
 
 	r := reqf.New()
@@ -535,7 +537,7 @@ func Test_Back(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -621,7 +623,7 @@ func Test_Res(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -689,7 +691,7 @@ func Test_Cookie(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -754,7 +756,7 @@ func Test_Retry(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -835,7 +837,7 @@ func Test_Retry2(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -959,7 +961,7 @@ func Test_ResBody(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -1014,7 +1016,7 @@ func Test_AlwaysUp(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 	conf.Routes[0].Backs[0].Disable()
@@ -1109,7 +1111,7 @@ func Test_Filiter(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -1183,7 +1185,7 @@ func Test_TO(t *testing.T) {
 		},
 	}
 
-	go conf.Run(ctx, logger)()
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
@@ -1201,5 +1203,157 @@ func Test_TO(t *testing.T) {
 		if r.ResStatusCode() != http.StatusGatewayTimeout {
 			t.Fatal(e)
 		}
+	}
+}
+
+func Test_Shutdown(t *testing.T) {
+	ctx := t.Context()
+	ctx, cancle := context.WithCancel(ctx)
+	defer cancle()
+
+	conf := &Config{
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path:     []string{"/"},
+				RollRule: "order",
+				AlwaysUp: true,
+				Setting: Setting{
+					PathAdd: true,
+				},
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+					},
+				},
+			},
+		},
+	}
+
+	w1 := pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	})
+	defer w1.Shutdown()
+	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/1`: func(w http.ResponseWriter, r *http.Request) {
+			cancle()
+			time.Sleep(time.Second)
+			w.Write([]byte{'1'})
+		},
+	})
+
+	go conf.Run(ctx, logger)
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/1",
+	}); e != nil {
+		t.Fatal(e)
+	} else if e := r.Respon(func(b []byte) error {
+		if b[0] != '1' {
+			return errors.New("1")
+		}
+		return nil
+	}); e != nil {
+		t.Fatal(e)
+	}
+}
+
+func Test_ReFlash(t *testing.T) {
+	ctx := t.Context()
+	ctx, cancle := context.WithCancel(ctx)
+
+	conf := &Config{
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path:     []string{"/"},
+				RollRule: "order",
+				AlwaysUp: true,
+				Setting: Setting{
+					PathAdd: true,
+				},
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+					},
+				},
+			},
+		},
+	}
+	conf1 := &Config{
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path:     []string{"/"},
+				RollRule: "order",
+				AlwaysUp: true,
+				Setting: Setting{
+					PathAdd: true,
+				},
+				Backs: []Back{
+					{
+						Name:   "2",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+					},
+				},
+			},
+		},
+	}
+
+	w1 := pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	})
+	defer w1.Shutdown()
+	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/1`: func(w http.ResponseWriter, r *http.Request) {
+			cancle()
+			go conf1.Run(t.Context(), logger)
+			time.Sleep(time.Second)
+
+			r3 := reqf.New()
+			if e := r3.Reqf(reqf.Rval{
+				Url: "http://127.0.0.1:19000/2",
+			}); e != nil {
+				t.Fatal(e)
+			} else if e := r3.Respon(func(b []byte) error {
+				if b[0] != '2' {
+					return errors.New("2")
+				}
+				return nil
+			}); e != nil {
+				t.Fatal(e)
+			}
+
+			w.Write([]byte{'1'})
+		},
+		`/2`: func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte{'2'})
+		},
+	})
+
+	go conf.Run(ctx, logger)
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/1",
+	}); e != nil {
+		t.Fatal(e)
+	} else if e := r.Respon(func(b []byte) error {
+		if b[0] != '1' {
+			return errors.New("1")
+		}
+		return nil
+	}); e != nil {
+		t.Fatal(e)
 	}
 }

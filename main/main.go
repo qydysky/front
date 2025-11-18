@@ -264,7 +264,7 @@ func main() {
 		}
 
 		for i := 0; i < len(configS); i++ {
-			go configS[i].Run(ctx, logger)()
+			go configS[i].Run(ctx, logger)
 		}
 
 		select {
@@ -277,7 +277,7 @@ func main() {
 		case <-ctx.Done():
 		}
 
-		logger.L(`I:`, "退出中")
+		logger.L(`I:`, "停止监听端口，等待连接结束")
 		adminCancle()
 
 		if e := cancle(); errors.Is(e, pctx.ErrWaitTo) {
