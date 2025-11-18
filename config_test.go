@@ -1156,7 +1156,7 @@ func Test_TO(t *testing.T) {
 			time.Sleep(2 * time.Second)
 		},
 		`/2`: func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte{'1'})
+			pweb.WithFlush(w).Write([]byte{'1'})
 			time.Sleep(2 * time.Second)
 		},
 	})

@@ -87,9 +87,15 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 	}
 	// }
 
-	if pctx.Done(ctx) || pctx.Done(r.Context()) {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, context.Canceled, time.Since(opT)))
+	if pctx.Done(ctx) {
+		w.WriteHeader(http.StatusGatewayTimeout)
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.DeadlineExceeded, time.Since(opT)))
 		chosenBack.Disable()
+		return context.DeadlineExceeded
+	}
+
+	if pctx.Done(r.Context()) {
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, context.Canceled, time.Since(opT)))
 		return context.Canceled
 	}
 
@@ -158,7 +164,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 					chosenBack.Disable()
 				}
 				logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-				return ErrCopy
+				return errors.Join(ErrCopy, e)
 			}
 		case e := <-copyWsMsg(conn, req, blocksi):
 			if e != nil {
@@ -166,7 +172,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 					chosenBack.Disable()
 				}
 				logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
-				return ErrCopy
+				return errors.Join(ErrCopy, e)
 			}
 		case <-ctx.Done():
 		}

@@ -89,7 +89,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 			return netUrl.Parse(chosenBack.getProxy())
 		}
 	}
-	
+
 	if cer, err := chosenBack.getVerifyPeerCer(); err == nil {
 		pool := x509.NewCertPool()
 		if pool.AppendCertsFromPEM(cer) {
@@ -124,9 +124,15 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		chosenBack.Disable()
 	}
 
-	if pctx.Done(ctx) || pctx.Done(r.Context()) {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.Canceled, time.Since(opT)))
+	if pctx.Done(ctx) {
+		w.WriteHeader(http.StatusGatewayTimeout)
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.DeadlineExceeded, time.Since(opT)))
 		chosenBack.Disable()
+		return context.DeadlineExceeded
+	}
+
+	if pctx.Done(r.Context()) {
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.Canceled, time.Since(opT)))
 		return context.Canceled
 	}
 
@@ -192,7 +198,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 	if tmpbuf, put, e := blocksi.Get(); e != nil {
 		logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
 		chosenBack.Disable()
-		return ErrCopy
+		return errors.Join(ErrCopy, e)
 	} else {
 		defer put()
 
@@ -223,7 +229,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 			case `gzip`:
 				if tmp, e := gzip.NewReader(resp.Body); e != nil {
 					logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
-					return ErrCopy
+					return errors.Join(ErrCopy, e)
 				} else {
 					reader = tmp
 					w1 := gzip.NewWriter(w)
@@ -239,7 +245,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 			case `deflate`:
 				if tmp, e := flate.NewWriter(w, 1); e != nil {
 					logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
-					return ErrCopy
+					return errors.Join(ErrCopy, e)
 				} else {
 					reader = flate.NewReader(resp.Body)
 					writer = pio.RWC{
@@ -262,21 +268,21 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 			if dealBody {
 				if e := pio.CopyDealer(writer, reader, tmpbuf, dealers...); e != nil {
 					logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
-					return ErrCopy
+					return errors.Join(ErrCopy, e)
 				}
 			} else if _, e = io.CopyBuffer(w, resp.Body, tmpbuf); e != nil {
 				logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
 				if !errors.Is(e, context.Canceled) {
 					chosenBack.Disable()
 				}
-				return ErrCopy
+				return errors.Join(ErrCopy, e)
 			}
 		} else if _, e = io.CopyBuffer(w, resp.Body, tmpbuf); e != nil {
 			logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
 			if !errors.Is(e, context.Canceled) {
 				chosenBack.Disable()
 			}
-			return ErrCopy
+			return errors.Join(ErrCopy, e)
 		}
 	}
 	return nil

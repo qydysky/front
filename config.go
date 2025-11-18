@@ -26,6 +26,7 @@ import (
 	filiter "github.com/qydysky/front/filiter"
 	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
+	pe "github.com/qydysky/part/errors"
 	pfile "github.com/qydysky/part/file"
 	pio "github.com/qydysky/part/io"
 	reqf "github.com/qydysky/part/reqf"
@@ -278,12 +279,12 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 							break
 						}
 					}
-					switch err {
-					case nil:
+					switch {
+					case err == nil:
 						return
-					case context.Canceled:
-						w.WriteHeader(http.StatusGatewayTimeout)
-					case ErrHeaderCheckFail, ErrBodyCheckFail, ErrCheckFail, ErrNoRoute:
+					case errors.Is(err, context.DeadlineExceeded):
+						return
+					case errors.Is(err, ErrHeaderCheckFail), errors.Is(err, ErrBodyCheckFail), errors.Is(err, ErrCheckFail), errors.Is(err, ErrNoRoute):
 						w.WriteHeader(http.StatusForbidden)
 					default:
 						w.WriteHeader(http.StatusNotFound)
@@ -637,11 +638,11 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 			break
 		}
 
-		logger.Debug(`T:`, fmt.Sprintf(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backP.Name, "ErrCanRetry", err))
+		logger.Debug(`T:`, fmt.Sprintf(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backP.Name, "ErrCanRetry", pe.ErrorFormat(err, pe.ErrActionInLineFunc)))
 	}
 
 	if err != nil {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", err))
+		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", pe.ErrorFormat(err, pe.ErrActionInLineFunc)))
 	}
 	return
 }
