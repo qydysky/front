@@ -3,7 +3,6 @@ package front
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,12 +14,13 @@ import (
 	"github.com/qydysky/front/utils"
 	component2 "github.com/qydysky/part/component2"
 	pfile "github.com/qydysky/part/file"
-	pslice "github.com/qydysky/part/slice"
+	plog "github.com/qydysky/part/log/v2"
+	pool "github.com/qydysky/part/pool"
 )
 
 func init() {
 	type I interface {
-		Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
+		Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger *plog.Log, blocksi pool.BlocksI[byte]) error
 	}
 	if e := component2.Register[I]("local", localDealer{}); e != nil {
 		panic(e)
@@ -29,7 +29,7 @@ func init() {
 
 type localDealer struct{}
 
-func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
+func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger *plog.Log, blocksi pool.BlocksI[byte]) error {
 	var (
 		env       = make(map[string]string)
 		opT       = time.Now()
@@ -39,7 +39,7 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 	path := chosenBack.To
 	if chosenBack.getPathAdd() {
 		if s, e := url.PathUnescape(r.URL.Path); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, "Err", e, time.Since(opT)))
+			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, "Err", e, time.Since(opT))
 			return ErrDealReqUri
 		} else {
 			path += s
@@ -49,11 +49,11 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 	path = filepath.Clean(dealUri(path, chosenBack.getDealerReqUri()))
 
 	if !pfile.New(path, 0, true).IsExist() {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, "Err", errors.New("NotExist "+path), time.Since(opT)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, "Err", errors.New("NotExist "+path), time.Since(opT))
 		return MarkRetry(os.ErrNotExist)
 	}
 
-	logger.Debug(`T:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT)))
+	logger.TF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT))
 
 	if chosenBack.getSplicing() != 0 {
 		cookie := &http.Cookie{
@@ -76,7 +76,7 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 	// if e :=
 	copyHeader(env, http.Header{}, w.Header(), chosenBack.getDealerResHeader())
 	// ; e != nil {
-	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, "BLOCK", e, time.Since(opT)))
+	// 	logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, "BLOCK", e, time.Since(opT)))
 	// 	return ErrDealResHeader
 	// }
 

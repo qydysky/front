@@ -22,13 +22,14 @@ import (
 	utils "github.com/qydysky/front/utils"
 	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
-	pslice "github.com/qydysky/part/slice"
+	plog "github.com/qydysky/part/log/v2"
+	pool "github.com/qydysky/part/pool"
 	"golang.org/x/net/proxy"
 )
 
 func init() {
 	type I interface {
-		Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
+		Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger *plog.Log, blocksi pool.BlocksI[byte]) error
 	}
 	if e := component2.Register[I]("ws", wsDealer{}); e != nil {
 		panic(e)
@@ -37,7 +38,7 @@ func init() {
 
 type wsDealer struct{}
 
-func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
+func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger *plog.Log, blocksi pool.BlocksI[byte]) error {
 	var (
 		env       = make(map[string]string)
 		opT       = time.Now()
@@ -69,33 +70,33 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 	// if e :=
 	copyHeader(env, r.Header, reqHeader, chosenBack.getDealerReqHeader())
 	// ; e != nil {
-	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+	// 	logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
 	// 	return ErrDealReqHeader
 	// }
 
 	var e error
 	conn, resp, e = DialContext(ctx, url, reqHeader, chosenBack)
 	if e != nil && !errors.Is(e, context.Canceled) && !errors.Is(e, context.Canceled) && !errors.Is(e, context.DeadlineExceeded) {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
 		chosenBack.Disable()
 		return MarkRetry(ErrResFail)
 	}
 
 	if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrResTO, time.Since(opT)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrResTO, time.Since(opT))
 		chosenBack.Disable()
 	}
 	// }
 
 	if pctx.Done(ctx) {
 		w.WriteHeader(http.StatusGatewayTimeout)
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.DeadlineExceeded, time.Since(opT)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.DeadlineExceeded, time.Since(opT))
 		chosenBack.Disable()
 		return context.DeadlineExceeded
 	}
 
 	if pctx.Done(r.Context()) {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, context.Canceled, time.Since(opT)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, context.Canceled, time.Since(opT))
 		return context.Canceled
 	}
 
@@ -107,9 +108,9 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 	for filiter := range chosenBack.getFiliters() {
 		noPassFiliter = true
 		if ok, e := filiter.ResHeader.Match(resp.Header); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
 		} else if !ok {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrHeaderCheckFail, time.Since(opT)))
+			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrHeaderCheckFail, time.Since(opT))
 			continue
 		}
 		noPassFiliter = false
@@ -120,7 +121,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		return MarkRetry(ErrHeaderCheckFail)
 	}
 
-	logger.Debug(`T:`, fmt.Sprintf("%v > %v > %v ws ok %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT)))
+	logger.TF("%v > %v > %v ws ok %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT))
 
 	if chosenBack.route.RollRule != `` {
 		chosenBack.be(opT)
@@ -148,7 +149,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 	// if e :=
 	copyHeader(env, resp.Header, resHeader, chosenBack.getDealerResHeader())
 	// ; e != nil {
-	// 	logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+	// 	logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
 	// 	return ErrDealResHeader
 	// }
 
@@ -163,7 +164,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 				if !errors.Is(e, context.Canceled) {
 					chosenBack.Disable()
 				}
-				logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+				logger.EF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
 				return errors.Join(ErrCopy, e)
 			}
 		case e := <-copyWsMsg(conn, req, blocksi):
@@ -171,7 +172,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 				if !errors.Is(e, context.Canceled) {
 					chosenBack.Disable()
 				}
-				logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT)))
+				logger.EF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
 				return errors.Join(ErrCopy, e)
 			}
 		case <-ctx.Done():
@@ -181,7 +182,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 	}
 }
 
-func copyWsMsg(dst io.Writer, src io.Reader, blocksi pslice.BlocksI[byte]) <-chan error {
+func copyWsMsg(dst io.Writer, src io.Reader, blocksi pool.BlocksI[byte]) <-chan error {
 	c := make(chan error, 1)
 	go func() {
 		if tmpbuf, put, e := blocksi.Get(); e != nil {

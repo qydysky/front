@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/pem"
 	"errors"
 	"flag"
@@ -19,10 +20,12 @@ import (
 	pcs "github.com/qydysky/part/crypto/symmetric"
 	pctx "github.com/qydysky/part/ctx"
 	pfile "github.com/qydysky/part/file"
-	plog "github.com/qydysky/part/log"
+	plog "github.com/qydysky/part/log/v2"
 	reqf "github.com/qydysky/part/reqf"
+	psql "github.com/qydysky/part/sql"
 	psys "github.com/qydysky/part/sys"
 	pweb "github.com/qydysky/part/web"
+	_ "modernc.org/sqlite"
 )
 
 func main() {
@@ -115,27 +118,32 @@ func main() {
 
 	for exit := false; !exit; {
 		// 日志初始化
-		logger := plog.New(plog.Config{
-			Stdout: true,
-			File:   *logFile,
-			Prefix_string: map[string]struct{}{
-				`T:`: plog.On,
-				`I:`: plog.On,
-				`W:`: plog.On,
-				`E:`: plog.On,
-			},
+		logger := plog.New(&plog.Log{
+			File: *logFile,
 		}).Base(time.Now().Format("20060102150405>"))
 
+		if *logFile != "" {
+			db, err := sql.Open("sqlite", time.Now().Format("20060102150405.log.sqlite"))
+			if err != nil {
+				logger.E(err)
+			} else {
+				defer db.Close()
+				_ = psql.BeginTx(db, context.Background()).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
+				logger = logger.LDB(db, psql.PlaceHolderA, "insert into log ({Date},{Prefix},{Base},{Msgs})")
+			}
+		}
+
 		if *noLog {
-			delete(logger.Config.Prefix_string, `E:`)
-			delete(logger.Config.Prefix_string, `W:`)
-			delete(logger.Config.Prefix_string, `I:`)
-			delete(logger.Config.Prefix_string, `T:`)
+			logger.Level(map[plog.Level]string{})
 		}
 
 		if *noDebugLog {
-			logger.L(`I:`, "关闭输出debug")
-			delete(logger.Config.Prefix_string, `T:`)
+			logger.IF("关闭输出debug")
+			logger.Level(map[plog.Level]string{
+				plog.I: `I:`,
+				plog.W: `W:`,
+				plog.E: `E:`,
+			})
 		}
 
 		// 根ctx
@@ -145,7 +153,7 @@ func main() {
 		configS := []pfront.Config{}
 		configF := pfile.New(*configP, 0, true)
 		if !configF.IsExist() {
-			logger.L(`E:`, "配置不存在")
+			logger.E("配置不存在")
 			return
 		}
 		defer func() {
@@ -158,7 +166,7 @@ func main() {
 		)
 		if *adminPort > 0 {
 			if len(*adminPath) <= 3 || !strings.HasPrefix(*adminPath, "/") || !strings.HasPrefix(*adminPath, "/") {
-				logger.L(`E:`, "adminPath 必须大于3字符长度并以/开头及结尾")
+				logger.E("adminPath 必须大于3字符长度并以/开头及结尾")
 				return
 			}
 			reloadPath := fmt.Sprintf("http://127.0.0.1:%d%sreload", *adminPort, *adminPath)
@@ -169,10 +177,10 @@ func main() {
 				if e := r.Reqf(reqf.Rval{
 					Url: reloadPath,
 				}); e != nil {
-					logger.L(`E:`, "reload", e)
+					logger.E("reload", e)
 				} else {
 					r.Respon(func(b []byte) error {
-						logger.L(`I:`, "reload", string(b))
+						logger.IF("reload", string(b))
 						return nil
 					})
 				}
@@ -184,10 +192,10 @@ func main() {
 				if e := r.Reqf(reqf.Rval{
 					Url: stopPath,
 				}); e != nil {
-					logger.L(`E:`, "stop", e)
+					logger.E("stop", e)
 				} else {
 					r.Respon(func(b []byte) error {
-						logger.L(`I:`, "stop", string(b))
+						logger.IF("stop", string(b))
 						return nil
 					})
 				}
@@ -199,10 +207,10 @@ func main() {
 				if e := r.Reqf(reqf.Rval{
 					Url: restartPath,
 				}); e != nil {
-					logger.L(`E:`, "restart", e)
+					logger.E("restart", e)
 				} else {
 					r.Respon(func(b []byte) error {
-						logger.L(`I:`, "restart", string(b))
+						logger.IF("restart", string(b))
 						return nil
 					})
 				}
@@ -237,9 +245,9 @@ func main() {
 				if adminSer, err := pweb.NewSyncMapNoPanic(&http.Server{
 					Addr: fmt.Sprintf("127.0.0.1:%d", *adminPort),
 				}, webPath); err == nil {
-					logger.L(`I:`, "重载端口", reloadPath)
-					logger.L(`I:`, "重起端口", restartPath)
-					logger.L(`I:`, "停止端口", stopPath)
+					logger.IF("重载端口", reloadPath)
+					logger.IF("重起端口", restartPath)
+					logger.IF("停止端口", stopPath)
 					adminCancle = func() { adminSer.Shutdown(ctx) }
 					break
 				} else {
@@ -249,17 +257,17 @@ func main() {
 					case <-timer.C:
 						if !hasErr {
 							hasErr = true
-							logger.Warn(`W:`, fmt.Sprintf("%v. Retry...", err))
+							logger.WF("%v. Retry...", err)
 						}
 					}
 				}
 			}
 		}
 
-		logger.L(`I:`, "启动")
+		logger.IF("启动")
 		// 加载配置
 		if e := pfront.Load(configF, &configS); e != nil {
-			logger.L(`E:`, e)
+			logger.E(e)
 			return
 		}
 
@@ -277,13 +285,13 @@ func main() {
 		case <-ctx.Done():
 		}
 
-		logger.L(`I:`, "停止监听端口，等待连接结束")
+		logger.IF("停止监听端口，等待连接结束")
 		adminCancle()
 
 		if e := cancle(); errors.Is(e, pctx.ErrWaitTo) {
-			logger.L(`E:`, "退出超时")
+			logger.E("退出超时")
 		} else {
-			logger.L(`I:`, "退出")
+			logger.IF("退出")
 		}
 	}
 }

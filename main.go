@@ -20,15 +20,9 @@ import (
 	utils "github.com/qydysky/front/utils"
 	pctx "github.com/qydysky/part/ctx"
 	pfile "github.com/qydysky/part/file"
+	plog "github.com/qydysky/part/log/v2"
 	pweb "github.com/qydysky/part/web"
 )
-
-type Logger interface {
-	Error(msg string, args ...any)
-	Debug(msg string, args ...any)
-	Info(msg string, args ...any)
-	Warn(msg string, args ...any)
-}
 
 type File interface {
 	Read(data []byte) (int, error)
@@ -48,13 +42,13 @@ func Load(configF *pfile.File, configS *[]Config) error {
 }
 
 // 测试
-func Test(ctx context.Context, port int, logger Logger) {
+func Test(ctx context.Context, port int, logger *plog.Log) {
 	if port == 0 {
 		return
 	}
 	ctx1, done1 := pctx.WaitCtx(ctx)
 	defer done1()
-	logger.Info(`I:`, "启动", fmt.Sprintf("127.0.0.1:%d", port))
+	logger.IF("启动", fmt.Sprintf("127.0.0.1:%d", port))
 	s := pweb.New(&http.Server{
 		Addr:         fmt.Sprintf("127.0.0.1:%d", port),
 		WriteTimeout: time.Second * time.Duration(10),

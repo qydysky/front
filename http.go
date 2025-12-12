@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	netUrl "net/url"
@@ -22,13 +21,13 @@ import (
 	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
 	pio "github.com/qydysky/part/io"
+	plog "github.com/qydysky/part/log/v2"
 	pool "github.com/qydysky/part/pool"
-	pslice "github.com/qydysky/part/slice"
 )
 
 func init() {
 	type I interface {
-		Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
+		Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger *plog.Log, blocksi pool.BlocksI[byte]) error
 	}
 	if e := component2.Register[I]("http", httpDealer{}); e != nil {
 		panic(e)
@@ -48,7 +47,7 @@ var clientPool = pool.New(pool.PoolFunc[http.Client]{
 	},
 }, -1)
 
-func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error {
+func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger *plog.Log, blocksi pool.BlocksI[byte]) error {
 	var (
 		env       = make(map[string]string)
 		opT       = time.Now()
@@ -67,7 +66,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	req, e := http.NewRequestWithContext(ctx, r.Method, url, r.Body)
 	if e != nil {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT))
 		chosenBack.Disable()
 		return MarkRetry(ErrReqCreFail)
 	}
@@ -106,38 +105,38 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 				return
 			}
 		} else {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, ErrCerVerify, time.Since(opT)))
+			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, ErrCerVerify, time.Since(opT))
 		}
 	} else if err != ErrEmptyVerifyPeerCerByte {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, err, time.Since(opT)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, err, time.Since(opT))
 	}
 
 	resp, e = client.Do(req)
 	if e != nil && !errors.Is(e, ErrRedirect) && !errors.Is(e, context.Canceled) && !errors.Is(e, context.DeadlineExceeded) {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT))
 		chosenBack.Disable()
 		return MarkRetry(ErrResFail)
 	}
 
 	if chosenBack.getErrToSec() != 0 && time.Since(opT).Seconds() > chosenBack.getErrToSec() {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, ErrResTO, time.Since(opT)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, ErrResTO, time.Since(opT))
 		chosenBack.Disable()
 	}
 
 	if pctx.Done(ctx) {
 		w.WriteHeader(http.StatusGatewayTimeout)
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.DeadlineExceeded, time.Since(opT)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.DeadlineExceeded, time.Since(opT))
 		chosenBack.Disable()
 		return context.DeadlineExceeded
 	}
 
 	if pctx.Done(r.Context()) {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.Canceled, time.Since(opT)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.Canceled, time.Since(opT))
 		return context.Canceled
 	}
 
 	if resp == nil {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT))
 		return MarkRetry(ErrResFail)
 	}
 
@@ -145,9 +144,9 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 	for filiter := range chosenBack.getFiliters() {
 		noPassFiliter = true
 		if ok, e := filiter.ResHeader.Match(resp.Header); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
+			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT))
 		} else if !ok {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, ErrHeaderCheckFail, time.Since(opT)))
+			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, ErrHeaderCheckFail, time.Since(opT))
 			continue
 		}
 		noPassFiliter = false
@@ -157,7 +156,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		return MarkRetry(ErrHeaderCheckFail)
 	}
 
-	logger.Debug(`T:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT)))
+	logger.TF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT))
 
 	if chosenBack.route.RollRule != `` {
 		chosenBack.be(opT)
@@ -196,7 +195,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	defer resp.Body.Close()
 	if tmpbuf, put, e := blocksi.Get(); e != nil {
-		logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
+		logger.EF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT))
 		chosenBack.Disable()
 		return errors.Join(ErrCopy, e)
 	} else {
@@ -228,7 +227,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 				dealBody = true
 			case `gzip`:
 				if tmp, e := gzip.NewReader(resp.Body); e != nil {
-					logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
+					logger.EF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT))
 					return errors.Join(ErrCopy, e)
 				} else {
 					reader = tmp
@@ -244,7 +243,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 				dealBody = true
 			case `deflate`:
 				if tmp, e := flate.NewWriter(w, 1); e != nil {
-					logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
+					logger.EF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT))
 					return errors.Join(ErrCopy, e)
 				} else {
 					reader = flate.NewReader(resp.Body)
@@ -267,18 +266,18 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 			}
 			if dealBody {
 				if e := pio.CopyDealer(writer, reader, tmpbuf, dealers...); e != nil {
-					logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
+					logger.EF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT))
 					return errors.Join(ErrCopy, e)
 				}
 			} else if _, e = io.CopyBuffer(w, resp.Body, tmpbuf); e != nil {
-				logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
+				logger.EF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT))
 				if !errors.Is(e, context.Canceled) {
 					chosenBack.Disable()
 				}
 				return errors.Join(ErrCopy, e)
 			}
 		} else if _, e = io.CopyBuffer(w, resp.Body, tmpbuf); e != nil {
-			logger.Error(`E:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT)))
+			logger.EF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT))
 			if !errors.Is(e, context.Canceled) {
 				chosenBack.Disable()
 			}

@@ -28,8 +28,9 @@ import (
 	pe "github.com/qydysky/part/errors"
 	pfile "github.com/qydysky/part/file"
 	pio "github.com/qydysky/part/io"
+	plog "github.com/qydysky/part/log/v2"
+	pool "github.com/qydysky/part/pool"
 	reqf "github.com/qydysky/part/reqf"
-	pslice "github.com/qydysky/part/slice"
 	psync "github.com/qydysky/part/sync"
 	pweb "github.com/qydysky/part/web"
 )
@@ -37,18 +38,17 @@ import (
 var ErrDuplicatePath = errors.New(`ErrDuplicatePath`)
 
 type Config struct {
-	lock sync.RWMutex `json:"-"`
-	Addr string       `json:"addr"`
+	Addr string `json:"addr"`
 	TLS  struct {
 		Pub     string   `json:"pub,omitempty"`
 		Key     string   `json:"key,omitempty"`
 		Decrypt []string `json:"decrypt,omitempty"`
 	} `json:"tls"`
 	RetryBlocks  Blocks                      `json:"retryBlocks"`
-	RetryBlocksI pslice.BlocksI[byte]        `json:"-"`
+	RetryBlocksI pool.BlocksI[byte]          `json:"-"`
 	MatchRule    string                      `json:"matchRule"`
 	CopyBlocks   Blocks                      `json:"copyBlocks"`
-	BlocksI      pslice.BlocksI[byte]        `json:"-"`
+	BlocksI      pool.BlocksI[byte]          `json:"-"`
 	webpath      *pweb.WebPath               `json:"-"`
 	routeMap     psync.MapG[string, *Pather] `json:"-"`
 	Routes       []Route                     `json:"routes"`
@@ -64,7 +64,7 @@ type Blocks struct {
 }
 
 // Run会创建协程，启动服务，并阻塞直到rootCtx.Done，rootCtx.Done之后，
-func (t *Config) Run(rootCtx context.Context, logger Logger) {
+func (t *Config) Run(rootCtx context.Context, logger *plog.Log) {
 
 	ctx, done := pctx.WithWait(context.Background(), 0, time.Minute)
 
@@ -132,9 +132,9 @@ func (t *Config) Run(rootCtx context.Context, logger Logger) {
 			pri = buf.Bytes()
 		}
 		if errPub != nil || errPri != nil || errPubDecrypt != nil || errPriDecrypt != nil {
-			logger.Error(`E:`, fmt.Sprintf("%v errPub(%v) errPri(%v) errPubDecrypt(%v) errPriDecrypt(%v)", t.Addr, errPub, errPri, errPubDecrypt, errPriDecrypt))
+			logger.EF("%v errPub(%v) errPri(%v) errPubDecrypt(%v) errPriDecrypt(%v)", t.Addr, errPub, errPri, errPubDecrypt, errPriDecrypt)
 		} else if cert, e := tls.X509KeyPair(pub, pri); e != nil {
-			logger.Error(`E:`, fmt.Sprintf("%v %v", t.Addr, e))
+			logger.EF("%v %v", t.Addr, e)
 		} else {
 			httpSer.TLSConfig = &tls.Config{
 				Certificates: []tls.Certificate{cert},
@@ -158,7 +158,7 @@ func (t *Config) Run(rootCtx context.Context, logger Logger) {
 		} else {
 			t.CopyBlocks.size = humanize.KByte * 16
 		}
-		t.BlocksI = pslice.NewBlocks[byte](t.CopyBlocks.size, t.CopyBlocks.Num)
+		t.BlocksI = pool.NewBlocks[byte](t.CopyBlocks.size, t.CopyBlocks.Num)
 	}
 	if size, err := humanize.ParseBytes(t.RetryBlocks.Size); err == nil && size > 0 {
 		t.RetryBlocks.size = int(size)
@@ -166,7 +166,7 @@ func (t *Config) Run(rootCtx context.Context, logger Logger) {
 		t.RetryBlocks.size = humanize.MByte
 	}
 	if t.RetryBlocks.size > 0 && t.RetryBlocks.Num > 0 {
-		t.RetryBlocksI = pslice.NewBlocks[byte](t.RetryBlocks.size, t.RetryBlocks.Num)
+		t.RetryBlocksI = pool.NewBlocks[byte](t.RetryBlocks.size, t.RetryBlocks.Num)
 	}
 
 	t.webpath = &pweb.WebPath{}
@@ -174,15 +174,15 @@ func (t *Config) Run(rootCtx context.Context, logger Logger) {
 	t.SwapSign(ctx, logger)
 
 	shutdownf := t.startServer(logger, &httpSer, time.Millisecond*100)
-	logger.Info(`I:`, fmt.Sprintf("%v running", t.Addr))
+	logger.IF("%v running", t.Addr)
 
 	<-rootCtx.Done()
 	shutdownf()
 	_ = done()
-	logger.Info(`I:`, fmt.Sprintf("%v shutdown", t.Addr))
+	logger.IF("%v shutdown", t.Addr)
 }
 
-func (t *Config) startServer(logger Logger, conf *http.Server, retryDur time.Duration) (shutdown func(ctx ...context.Context)) {
+func (t *Config) startServer(logger *plog.Log, conf *http.Server, retryDur time.Duration) (shutdown func(ctx ...context.Context)) {
 	shutdown = func(ctx ...context.Context) {}
 
 	timer := time.NewTicker(retryDur)
@@ -207,7 +207,7 @@ func (t *Config) startServer(logger Logger, conf *http.Server, retryDur time.Dur
 		if err != nil {
 			if !hasErr {
 				hasErr = true
-				logger.Warn(`W:`, fmt.Sprintf("%v. Retry...", err))
+				logger.WF("%v. Retry...", err)
 			}
 			<-timer.C
 		} else {
@@ -224,7 +224,7 @@ type reqBufS struct {
 	allReaded  bool
 }
 
-func (t *Config) SwapSign(ctx context.Context, logger Logger) {
+func (t *Config) SwapSign(ctx context.Context, logger *plog.Log) {
 	// add new route
 	for k := 0; k < len(t.Routes); k++ {
 		route := &t.Routes[k]
@@ -245,7 +245,7 @@ func (t *Config) SwapSign(ctx context.Context, logger Logger) {
 				)
 
 				if len(r.RequestURI) > 8000 {
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.Addr, routePath, "BLOCK", ErrUriTooLong))
+					logger.WF(logFormat, reqId, r.RemoteAddr, t.Addr, routePath, "BLOCK", ErrUriTooLong)
 					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
@@ -355,7 +355,7 @@ func (t *Route) getFiliters() (f iter.Seq[*filiter.Filiter]) {
 	}
 }
 
-func (t *Route) SwapSign(logger Logger) {
+func (t *Route) SwapSign(logger *plog.Log) {
 	if len(t.Path) == 0 || t.config == nil {
 		return
 	}
@@ -363,10 +363,10 @@ func (t *Route) SwapSign(logger Logger) {
 	for i := 0; i < len(t.Backs); i++ {
 		t.Backs[i].route = t
 		if p, ok := t.backMap.Load(t.Backs[i].Id()); !ok {
-			logger.Info(`I:`, fmt.Sprintf("%v > %v > %v", t.config.Addr, t.Name, t.Backs[i].Name))
+			logger.IF("%v > %v > %v", t.config.Addr, t.Name, t.Backs[i].Name)
 			t.backMap.Store(t.Backs[i].Id(), &t.Backs[i])
 		} else if p.(*Back) != &t.Backs[i] {
-			logger.Info(`I:`, fmt.Sprintf("%v > %v ~ %v", t.config.Addr, t.Name, t.Backs[i].Name))
+			logger.IF("%v > %v ~ %v", t.config.Addr, t.Name, t.Backs[i].Name)
 		}
 	}
 
@@ -379,7 +379,7 @@ func (t *Route) SwapSign(logger Logger) {
 			}
 		}
 		if !exist {
-			logger.Info(`I:`, fmt.Sprintf("%v > %v x %v", t.config.Addr, t.Name, key))
+			logger.IF("%v > %v x %v", t.config.Addr, t.Name, key)
 			t.backMap.Delete(key)
 		} else {
 			value.(*Back).SwapSign(logger)
@@ -425,7 +425,7 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	return backLink
 }
 
-func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBufS, w http.ResponseWriter, r *http.Request) (err error) {
+func (t *Route) WR(reqId uint32, routePath string, logger *plog.Log, reqBuf *reqBufS, w http.ResponseWriter, r *http.Request) (err error) {
 	var (
 		logFormat         = "%d %v %v%v > %v %v %v"
 		logFormatWithName = "%v %v %v%v > %v > %v %v %v"
@@ -435,31 +435,31 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 	for filiter := range t.getFiliters() {
 		noPassFiliter = true
 		if ok, e := filiter.ReqAddr.Match(r); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
+			logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e)
 		} else if !ok {
 			continue
 		}
 
 		if ok, e := filiter.ReqHost.Match(r); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
+			logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e)
 		} else if !ok {
 			continue
 		}
 
 		if ok, e := filiter.ReqUri.Match(r); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
+			logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e)
 		} else if !ok {
 			continue
 		}
 
 		if ok, e := filiter.ReqHeader.Match(r.Header); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
+			logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e)
 		} else if !ok {
 			continue
 		}
 
 		if ok, e := filiter.ReqBody.Match(r); e != nil {
-			logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
+			logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e)
 		} else if !ok {
 			continue
 		}
@@ -536,13 +536,13 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 			ul()
 		}
 		if needUp >= 0 && t.AlwaysUp {
-			logger.Warn(`W:`, fmt.Sprintf(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backIs[needUp].Name, "Err", ErrReUp))
+			logger.WF(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backIs[needUp].Name, "Err", ErrReUp)
 			backIs[needUp].Enable()
 		}
 	}
 
 	type reqDealer interface {
-		Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger Logger, blocksi pslice.BlocksI[byte]) error
+		Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r *http.Request, routePath string, chosenBack *Back, logger *plog.Log, blocksi pool.BlocksI[byte]) error
 	}
 
 	// repack
@@ -553,9 +553,9 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 	if reqBuf != nil {
 		if r.Body != nil && reqContentLength != "" {
 			if n, e := strconv.Atoi(reqContentLength); e != nil {
-				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
+				logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e)
 			} else if n > reqBuf.maxCap {
-				logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", ErrReqReBodyOverflow))
+				logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", ErrReqReBodyOverflow)
 			} else {
 				reqBuf.used = true
 				offset := 0
@@ -564,7 +564,7 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 					offset += n
 					if e != nil {
 						if !errors.Is(e, io.EOF) {
-							logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e))
+							logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e)
 							w.WriteHeader(http.StatusBadRequest)
 							return nil
 						}
@@ -578,7 +578,7 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 				if !reqBuf.allReaded {
 					reqBuf.allowReuse = false
 					delayBody = r.Body
-					logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", ErrReqReBodyFull))
+					logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", ErrReqReBodyFull)
 				}
 			}
 		}
@@ -641,11 +641,11 @@ func (t *Route) WR(reqId uint32, routePath string, logger Logger, reqBuf *reqBuf
 			break
 		}
 
-		logger.Debug(`T:`, fmt.Sprintf(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backP.Name, "ErrCanRetry", pe.ErrorFormat(err, pe.ErrActionInLineFunc)))
+		logger.TF(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backP.Name, "ErrCanRetry", pe.ErrorFormat(err, pe.ErrActionInLineFunc))
 	}
 
 	if err != nil {
-		logger.Warn(`W:`, fmt.Sprintf(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", pe.ErrorFormat(err, pe.ErrActionInLineFunc)))
+		logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", pe.ErrorFormat(err, pe.ErrActionInLineFunc))
 	}
 	return
 }
@@ -683,7 +683,7 @@ func BatchRLock(backs []*Back) iter.Seq2[int, *Back] {
 	}
 }
 
-func (t *Back) SwapSign(logger Logger) {
+func (t *Back) SwapSign(logger *plog.Log) {
 	path := t.VerifyPeerCer
 	if path == "" {
 		path = t.route.VerifyPeerCer

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -15,23 +14,15 @@ import (
 
 	"github.com/qydysky/front/dealer"
 	"github.com/qydysky/front/filiter"
-	plog "github.com/qydysky/part/log"
+	plog "github.com/qydysky/part/log/v2"
 	reqf "github.com/qydysky/part/reqf"
 	pweb "github.com/qydysky/part/web"
 )
 
-var logger = plog.New(plog.Config{
-	Stdout: true,
-	Prefix_string: map[string]struct{}{
-		`T:`: plog.On,
-		`I:`: plog.On,
-		`W:`: plog.On,
-		`E:`: plog.On,
-	},
-})
+var logger = plog.New(&plog.Log{})
 
 func Test5(t *testing.T) {
-	t.Log(filepath.Clean(".//dd.lof"))
+	t.Log(time.Now().Format("20060102150405.sqlite3"))
 }
 
 func Benchmark1(b *testing.B) {
