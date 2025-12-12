@@ -136,17 +136,6 @@ func main() {
 			DBHolder: psql.PlaceHolderA,
 		}).Base(time.Now().Format("20060102150405>"))
 
-		if *logFile != "" {
-			db, err := sql.Open("sqlite", time.Now().Format("20060102150405.log.sqlite"))
-			if err != nil {
-				logger.E(err)
-			} else {
-				defer db.Close()
-				_ = psql.BeginTx(db, context.Background()).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
-				logger = logger.LDB(db, psql.PlaceHolderA, "insert into log ({Date},{Prefix},{Base},{Msgs})")
-			}
-		}
-
 		if *noLog {
 			logger.Level(map[plog.Level]string{})
 		}
