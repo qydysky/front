@@ -112,6 +112,17 @@ func main() {
 		}
 	}
 
+	var db *sql.DB
+	if *logFile != "" {
+		if tdb, err := sql.Open("sqlite", time.Now().Format("20060102150405.log.sqlite")); err != nil {
+			os.Stderr.Write([]byte(err.Error()))
+		} else {
+			defer db.Close()
+			db = tdb
+			_ = psql.BeginTx(db, context.Background()).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
+		}
+	}
+
 	// ctrl+c退出
 	var interrupt = make(chan os.Signal, 2)
 	signal.Notify(interrupt, os.Interrupt)
@@ -119,7 +130,10 @@ func main() {
 	for exit := false; !exit; {
 		// 日志初始化
 		logger := plog.New(&plog.Log{
-			File: *logFile,
+			File:     *logFile,
+			DBConn:   db,
+			DBInsert: "insert into log ({Date},{Prefix},{Base},{Msgs})",
+			DBHolder: psql.PlaceHolderA,
 		}).Base(time.Now().Format("20060102150405>"))
 
 		if *logFile != "" {
