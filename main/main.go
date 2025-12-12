@@ -132,7 +132,7 @@ func main() {
 		logger := plog.New(&plog.Log{
 			File:     *logFile,
 			DBConn:   db,
-			DBInsert: "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs}))",
+			DBInsert: "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})",
 			DBHolder: psql.PlaceHolderA,
 		}).Base(time.Now().Format("20060102150405>"))
 
