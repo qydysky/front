@@ -4,9 +4,8 @@
         "matchRule": "prefix",
         "routes": [
             {
-                "path": [
-                    "/"
-                ],
+                "name": "r1",
+                "path": ["/"],
                 "pathAdd": true,
                 "backs": [
                     {

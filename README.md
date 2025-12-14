@@ -24,6 +24,8 @@ Usage of ./main:
         adminPort, eg:10908
   -c string
         config (default "main.json")
+  -dbFile string
+        dbFile, eg./log/20060102150405.sqlite ,defalut no db File
   -decrypt string
         decrypt with pri.pem
   -encrypt string
