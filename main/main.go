@@ -35,6 +35,7 @@ func main() {
 	// 获取config路径
 	var (
 		configP    = flag.String("c", "main.json", "config")
+		dbFile     = flag.String("dbFile", "", "dbFile, eg./log/20060102150405.sqlite ,defalut no db File")
 		logFile    = flag.String("logFile", "", "logFile, defalut no log file")
 		adminPort  = flag.Int("adminPort", 0, "adminPort, eg:10908")
 		adminPath  = flag.String("adminPath", "", "adminPath, eg:/123/12/")
@@ -113,11 +114,10 @@ func main() {
 	}
 
 	var db *sql.DB
-	if *logFile != "" {
-		if tdb, err := sql.Open("sqlite", time.Now().Format("20060102150405.log.sqlite")); err != nil {
+	if *dbFile != "" {
+		if tdb, err := sql.Open("sqlite", time.Now().Format(*dbFile)); err != nil {
 			os.Stderr.Write([]byte(err.Error()))
 		} else {
-			defer db.Close()
 			db = tdb
 			_ = psql.BeginTx(db, context.Background()).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
 		}
@@ -134,7 +134,7 @@ func main() {
 			DBConn:   db,
 			DBInsert: "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})",
 			DBHolder: psql.PlaceHolderA,
-		}).Base(time.Now().Format("20060102150405>"))
+		}).Base(time.Now().Format("20060102150405"))
 
 		if *noLog {
 			logger.Level(map[plog.Level]string{})

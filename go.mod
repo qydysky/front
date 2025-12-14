@@ -6,7 +6,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/qydysky/brotli v0.0.0-20250531004300-54adcf96cc4a
-	github.com/qydysky/part v0.28.20251211084946
+	github.com/qydysky/part v0.28.20251214163330
 	golang.org/x/net v0.47.0
 )
 
@@ -30,7 +30,7 @@ require (
 	modernc.org/libc v1.67.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.40.1 // indirect
+	modernc.org/sqlite v1.40.1
 )
 
 // replace github.com/qydysky/part => ../part
