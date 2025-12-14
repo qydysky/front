@@ -11,14 +11,6 @@ require (
 )
 
 require (
-	github.com/klauspost/compress v1.18.2 // indirect
-	github.com/miekg/dns v1.1.68 // indirect
-	golang.org/x/mod v0.30.0 // indirect
-	golang.org/x/sync v0.18.0 // indirect
-	golang.org/x/tools v0.39.0 // indirect
-)
-
-require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -41,4 +33,4 @@ require (
 	modernc.org/sqlite v1.40.1
 )
 
-replace github.com/qydysky/part => ../part
+// replace github.com/qydysky/part => ../part
