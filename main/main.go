@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"time"
 
 	pfront "github.com/qydysky/front"
@@ -132,7 +133,7 @@ func main() {
 		// 日志初始化
 		logger := plog.New(&plog.Log{
 			File:     *logFile,
-			DBConn:   db,
+			DBPool:   psql.NewTxPool(db).RMutex(new(sync.RWMutex)),
 			DBInsert: "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})",
 			DBHolder: psql.PlaceHolderA,
 		}).Base(time.Now().Format("20060102150405"))
