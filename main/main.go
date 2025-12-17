@@ -120,7 +120,6 @@ func main() {
 			os.Stderr.Write([]byte(err.Error()))
 		} else {
 			db = tdb
-			db.SetMaxOpenConns(1)
 			_ = psql.BeginTx(db, context.Background()).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
 		}
 	}
