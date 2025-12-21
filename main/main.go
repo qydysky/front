@@ -130,12 +130,15 @@ func main() {
 
 	for exit := false; !exit; {
 		// 日志初始化
-		logger := plog.New(&plog.Log{
-			File:     *logFile,
-			DBPool:   psql.NewTxPool(db).RMutex(new(sync.RWMutex)),
-			DBInsert: "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})",
-			DBHolder: psql.PlaceHolderA,
-		}).Base(time.Now().Format("20060102150405"))
+		logger := plog.New(&plog.Log{}).Base(time.Now().Format("20060102150405"))
+
+		if *logFile != "" {
+			logger.LFile(*logFile)
+		}
+
+		if db != nil {
+			logger.LDB(psql.NewTxPool(db).RMutex(new(sync.RWMutex)), psql.PlaceHolderA, "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})")
+		}
 
 		if *noLog {
 			logger.Level(map[plog.Level]string{})
