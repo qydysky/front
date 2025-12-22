@@ -115,10 +115,16 @@ func main() {
 
 	var db *sql.DB
 	if *dbFile != "" {
-		if tdb, err := sql.Open("sqlite", time.Now().Format(*dbFile)); err != nil {
+		f := pfile.Open(time.Now().Format(*dbFile))
+		if f.IsExist() {
+			f.Delete()
+		}
+		f.Create()
+		f.Close()
+		if tdb, err := sql.Open("sqlite", f.Name()); err != nil {
 			os.Stderr.Write([]byte(err.Error()))
 		} else {
-			db.SetMaxOpenConns(1)
+			tdb.SetMaxOpenConns(1)
 			db = tdb
 			_ = psql.BeginTx(db, context.Background()).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
 		}
