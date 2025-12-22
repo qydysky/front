@@ -46,6 +46,7 @@ func Benchmark1(b *testing.B) {
 }
 
 func Test1(t *testing.T) {
+	ctx := context.Background()
 	j := []byte(`
 	{
 		"addr": "127.0.0.1:19000",
@@ -75,17 +76,17 @@ func Test1(t *testing.T) {
 	defer os.Remove("./a")
 	defer db.Close()
 
-	part.BeginTx(db, context.Background()).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
+	part.BeginTx(db, ctx).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
 
 	logger := logger.Base(1).LDB(part.NewTxPool(db).RMutex(new(sync.RWMutex)), part.PlaceHolderA, "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})")
 
-	go conf.Run(context.Background(), logger)
+	go conf.Run(ctx, logger)
 
 	time.Sleep(time.Second)
 
 	r := reqf.New()
 	r.Reqf(reqf.Rval{
-		Ctx: context.Background(),
+		Ctx: ctx,
 		Url: "http://127.0.0.1:19000/",
 	})
 
