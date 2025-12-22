@@ -66,7 +66,7 @@ type Blocks struct {
 // Run会创建协程，启动服务，并阻塞直到rootCtx.Done，rootCtx.Done之后，
 func (t *Config) Run(rootCtx context.Context, logger *plog.Log) {
 
-	ctx, done := pctx.WithWait(context.Background(), 0, time.Minute)
+	ctx, done := pctx.WithWait(rootCtx, 0, time.Second*10)
 
 	httpSer := http.Server{
 		Addr: t.Addr,
@@ -178,8 +178,8 @@ func (t *Config) Run(rootCtx context.Context, logger *plog.Log) {
 
 	<-rootCtx.Done()
 	shutdownf()
-	_ = done()
 	logger.IF("%v shutdown", t.Addr)
+	_ = done()
 }
 
 func (t *Config) startServer(logger *plog.Log, conf *http.Server, retryDur time.Duration) (shutdown func(ctx ...context.Context)) {
@@ -285,7 +285,7 @@ func (t *Config) SwapSign(ctx context.Context, logger *plog.Log) {
 						return
 					case errors.Is(err, context.DeadlineExceeded):
 						return
-					case errors.Is(err, ErrHeaderCheckFail), errors.Is(err, ErrBodyCheckFail), errors.Is(err, ErrCheckFail), errors.Is(err, ErrNoRoute):
+					case errors.Is(err, ErrHeaderCheckFail), errors.Is(err, ErrBodyCheckFail), errors.Is(err, ErrCheckFail):
 						w.WriteHeader(http.StatusForbidden)
 					default:
 						w.WriteHeader(http.StatusNotFound)

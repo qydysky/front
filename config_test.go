@@ -3,10 +3,12 @@ package front
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -14,9 +16,12 @@ import (
 
 	"github.com/qydysky/front/dealer"
 	"github.com/qydysky/front/filiter"
+	pctx "github.com/qydysky/part/ctx"
 	plog "github.com/qydysky/part/log/v2"
 	reqf "github.com/qydysky/part/reqf"
+	part "github.com/qydysky/part/sql"
 	pweb "github.com/qydysky/part/web"
+	_ "modernc.org/sqlite"
 )
 
 var logger = plog.New(&plog.Log{})
@@ -41,8 +46,73 @@ func Benchmark1(b *testing.B) {
 	}
 }
 
+func Test1(t *testing.T) {
+	db, err := sql.Open("sqlite", "./a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("./a")
+	defer db.Close()
+
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
+
+	j := []byte(`
+	{
+		"addr": "127.0.0.1:19000",
+		"routes": [
+			{
+				"name": "1",
+				"path": ["/"],
+				"backs": [
+					{
+						"name": "1"
+					}
+				]
+			}
+		]
+	}
+	`)
+
+	conf := &Config{}
+	if e := json.Unmarshal(j, conf); e != nil {
+		t.Fatal(e)
+	}
+
+	part.BeginTx(db, ctx).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
+
+	logger := logger.Base(1).LDB(part.NewTxPool(db).RMutex(new(sync.RWMutex)), part.PlaceHolderA, "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})")
+
+	go conf.Run(ctx, logger)
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	r.Reqf(reqf.Rval{
+		Ctx: ctx,
+		Url: "http://127.0.0.1:19000/",
+	})
+
+	r.Response(func(r *http.Response) error {
+		if r.StatusCode != 200 {
+			t.Fatal()
+		}
+		return nil
+	})
+
+	part.BeginTx(db, context.Background()).SimpleDo("select count(*) c from log").AfterQF(func(rows *sql.Rows) error {
+		c, _ := part.DealRowMap(rows).Raw["c"].(int64)
+		t.Log(c)
+		if c != 3 {
+			t.Fatal()
+		}
+		return nil
+	}).Run()
+}
+
 func Test_Uri6(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	j := []byte(`
 	{
@@ -128,7 +198,8 @@ func Test_Uri6(t *testing.T) {
 }
 
 func Test_Uri5(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	j := []byte(`
 	{
@@ -176,7 +247,8 @@ func Test_Uri5(t *testing.T) {
 }
 
 func Test_Uri7(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	var once atomic.Bool
 	web := pweb.New(&http.Server{
@@ -239,7 +311,8 @@ func Test_Uri7(t *testing.T) {
 }
 
 func Test_Uri4(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	web := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",
@@ -307,7 +380,8 @@ func Test_Uri4(t *testing.T) {
 }
 
 func Test_Uri3(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	web := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",
@@ -398,7 +472,8 @@ func Test_Uri3(t *testing.T) {
 }
 
 func Test_Uri2(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	web := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",
@@ -456,7 +531,8 @@ func Test_Uri2(t *testing.T) {
 }
 
 func Test_Uri(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	customFiliter := &filiter.Filiter{
 		ReqUri: filiter.Uri{
@@ -513,7 +589,8 @@ func Test_Uri(t *testing.T) {
 }
 
 func Test_Back(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	conf := &Config{
 		Addr: "127.0.0.1:19000",
@@ -579,7 +656,8 @@ func Test_Back(t *testing.T) {
 }
 
 func Test_Res(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	w1 := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",
@@ -640,7 +718,8 @@ func Test_Res(t *testing.T) {
 }
 
 func Test_Cookie(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	c1 := "login_locale=zh_CN; Max-Age=31536000; Expires=Wed, 15 Apr 2026 02:29:42; Path=/"
 	c2 := "login_locale=zh_CN; Max-Age=31536000; Expires=Wed, 15 Apr 2026 02:29:43; Path=/"
@@ -706,7 +785,8 @@ func Test_Cookie(t *testing.T) {
 }
 
 func Test_Retry(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	w1 := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19002",
@@ -761,7 +841,8 @@ func Test_Retry(t *testing.T) {
 }
 
 func Test_Retry2(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	w1 := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19002",
@@ -907,7 +988,8 @@ func Test_Retry2(t *testing.T) {
 }
 
 func Test_ResBody(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	w1 := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",
@@ -973,7 +1055,8 @@ func Test_ResBody(t *testing.T) {
 }
 
 func Test_AlwaysUp(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	w1 := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",
@@ -1028,7 +1111,8 @@ func Test_AlwaysUp(t *testing.T) {
 }
 
 func Test_Filiter(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	conf := &Config{
 		Addr: "127.0.0.1:19000",
@@ -1138,7 +1222,8 @@ func Test_Filiter(t *testing.T) {
 }
 
 func Test_TO(t *testing.T) {
-	ctx := t.Context()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	w1 := pweb.New(&http.Server{
 		Addr: "127.0.0.1:19001",
@@ -1198,9 +1283,8 @@ func Test_TO(t *testing.T) {
 }
 
 func Test_Shutdown(t *testing.T) {
-	ctx := t.Context()
-	ctx, cancle := context.WithCancel(ctx)
-	defer cancle()
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	conf := &Config{
 		Addr: "127.0.0.1:19000",
@@ -1229,7 +1313,7 @@ func Test_Shutdown(t *testing.T) {
 	defer w1.Shutdown()
 	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
 		`/1`: func(w http.ResponseWriter, r *http.Request) {
-			cancle()
+			go done()
 			time.Sleep(time.Second)
 			w.Write([]byte{'1'})
 		},
@@ -1255,8 +1339,8 @@ func Test_Shutdown(t *testing.T) {
 }
 
 func Test_ReFlash(t *testing.T) {
-	ctx := t.Context()
-	ctx, cancle := context.WithCancel(ctx)
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
 
 	conf := &Config{
 		Addr: "127.0.0.1:19000",
@@ -1305,7 +1389,7 @@ func Test_ReFlash(t *testing.T) {
 	defer w1.Shutdown()
 	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
 		`/1`: func(w http.ResponseWriter, r *http.Request) {
-			cancle()
+			go done()
 			go conf1.Run(t.Context(), logger)
 			time.Sleep(time.Second)
 
