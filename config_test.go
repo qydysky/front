@@ -3,10 +3,12 @@ package front
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,7 +18,9 @@ import (
 	"github.com/qydysky/front/filiter"
 	plog "github.com/qydysky/part/log/v2"
 	reqf "github.com/qydysky/part/reqf"
+	part "github.com/qydysky/part/sql"
 	pweb "github.com/qydysky/part/web"
+	_ "modernc.org/sqlite"
 )
 
 var logger = plog.New(&plog.Log{})
@@ -39,6 +43,67 @@ func Benchmark1(b *testing.B) {
 		m["123"] = "133"
 		f(m)
 	}
+}
+
+func Test1(t *testing.T) {
+	j := []byte(`
+	{
+		"addr": "127.0.0.1:19000",
+		"routes": [
+			{
+				"name": "1",
+				"path": ["/"],
+				"backs": [
+					{
+						"name": "1"
+					}
+				]
+			}
+		]
+	}
+	`)
+
+	conf := &Config{}
+	if e := json.Unmarshal(j, conf); e != nil {
+		t.Fatal(e)
+	}
+
+	db, err := sql.Open("sqlite", "./a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("./a")
+	defer db.Close()
+
+	part.BeginTx(db, context.Background()).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
+
+	logger := logger.Base(1).LDB(part.NewTxPool(db).RMutex(new(sync.RWMutex)), part.PlaceHolderA, "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})")
+
+	go conf.Run(context.Background(), logger)
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	r.Reqf(reqf.Rval{
+		Ctx: context.Background(),
+		Url: "http://127.0.0.1:19000/",
+	})
+
+	r.Response(func(r *http.Response) error {
+		if r.StatusCode != 200 {
+			t.Fatal()
+		}
+		return nil
+	})
+
+	part.BeginTx(db, context.Background()).SimpleDo("select count(*) c from log").AfterQF(func(rows *sql.Rows) error {
+		c, _ := part.DealRowMap(rows).Raw["c"].(int64)
+		t.Log(c)
+		if c != 3 {
+			t.Fatal()
+		}
+		return nil
+	}).Run()
 }
 
 func Test_Uri6(t *testing.T) {
