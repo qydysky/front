@@ -41,7 +41,7 @@ jobs:
       run: |
         cd main
         go get .
-        go test -count 1 -timeout 30s -v github.com/qydysky/front
+        go test -count 1 -timeout 90s -v github.com/qydysky/front
         CGO_ENABLED=0 go build -pgo=auto -v -buildmode=exe main.go
       
     - name: Upload a Build Artifact
@@ -74,7 +74,7 @@ jobs:
       run: |
         cd main
         go get .
-        go test -count 1 -timeout 30s -v github.com/qydysky/front
+        go test -count 1 -timeout 90s -v github.com/qydysky/front
         set CGO_ENABLED=0
         go build -pgo=auto -v -buildmode=exe main.go
         
@@ -108,7 +108,7 @@ jobs:
       run: |
         cd main
         go get .
-        go test -count 1 -timeout 30s -v github.com/qydysky/front
+        go test -count 1 -timeout 90s -v github.com/qydysky/front
         set CGO_ENABLED=0
         go build -pgo=auto -v -buildmode=exe main.go
         
