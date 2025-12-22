@@ -285,7 +285,7 @@ func (t *Config) SwapSign(ctx context.Context, logger *plog.Log) {
 						return
 					case errors.Is(err, context.DeadlineExceeded):
 						return
-					case errors.Is(err, ErrHeaderCheckFail), errors.Is(err, ErrBodyCheckFail), errors.Is(err, ErrCheckFail), errors.Is(err, ErrNoRoute):
+					case errors.Is(err, ErrHeaderCheckFail), errors.Is(err, ErrBodyCheckFail), errors.Is(err, ErrCheckFail):
 						w.WriteHeader(http.StatusForbidden)
 					default:
 						w.WriteHeader(http.StatusNotFound)
