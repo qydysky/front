@@ -46,7 +46,7 @@ func Benchmark1(b *testing.B) {
 }
 
 func Test1(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	j := []byte(`
 	{
 		"addr": "127.0.0.1:19000",
