@@ -1313,7 +1313,7 @@ func Test_Shutdown(t *testing.T) {
 	defer w1.Shutdown()
 	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
 		`/1`: func(w http.ResponseWriter, r *http.Request) {
-			done()
+			go done()
 			time.Sleep(time.Second)
 			w.Write([]byte{'1'})
 		},
@@ -1389,7 +1389,7 @@ func Test_ReFlash(t *testing.T) {
 	defer w1.Shutdown()
 	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
 		`/1`: func(w http.ResponseWriter, r *http.Request) {
-			done()
+			go done()
 			go conf1.Run(t.Context(), logger)
 			time.Sleep(time.Second)
 
