@@ -51,6 +51,7 @@ func Test1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	db.SetMaxOpenConns(1)
 	defer os.Remove("./a")
 	defer db.Close()
 
@@ -81,7 +82,7 @@ func Test1(t *testing.T) {
 
 	part.BeginTx(db, ctx).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
 
-	logger := logger.Base(1).LDB(part.NewTxPool(db).RMutex(new(sync.RWMutex)), part.PlaceHolderA, "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})")
+	logger := logger.Base(1).LDB(part.NewTxPool(db), part.PlaceHolderA, "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})")
 
 	go conf.Run(ctx, logger)
 
@@ -509,9 +510,6 @@ func Test_Uri2(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	reqb := []byte("1234")
-	resb := make([]byte, 5)
-
 	pipe := reqf.NewRawReqRes()
 	r := reqf.New()
 	if e := r.Reqf(reqf.Rval{
@@ -521,6 +519,9 @@ func Test_Uri2(t *testing.T) {
 	}); e != nil {
 		t.Fatal()
 	}
+
+	reqb := []byte("1234")
+	resb := make([]byte, 5)
 	pipe.ReqWrite(reqb)
 	pipe.ReqClose()
 	n, _ := pipe.ResRead(resb)
