@@ -239,6 +239,8 @@ func Test_Uri5(t *testing.T) {
 		}
 		return nil
 	})
+
+	t.Cleanup(func() {})
 }
 
 func Test_Uri7(t *testing.T) {
