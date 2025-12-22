@@ -51,6 +51,7 @@ func Test1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	db.SetMaxOpenConns(1)
 	defer os.Remove("./a")
 	defer db.Close()
 
@@ -81,7 +82,7 @@ func Test1(t *testing.T) {
 
 	part.BeginTx(db, ctx).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
 
-	logger := logger.Base(1).LDB(part.NewTxPool(db).RMutex(new(sync.RWMutex)), part.PlaceHolderA, "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})")
+	logger := logger.Base(1).LDB(part.NewTxPool(db), part.PlaceHolderA, "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})")
 
 	go conf.Run(ctx, logger)
 
