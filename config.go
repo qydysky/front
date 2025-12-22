@@ -66,7 +66,7 @@ type Blocks struct {
 // Run会创建协程，启动服务，并阻塞直到rootCtx.Done，rootCtx.Done之后，
 func (t *Config) Run(rootCtx context.Context, logger *plog.Log) {
 
-	ctx, done := pctx.WithWait(context.Background(), 0, time.Minute)
+	ctx, done := pctx.WithWait(rootCtx, 0, time.Minute)
 
 	httpSer := http.Server{
 		Addr: t.Addr,
