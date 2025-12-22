@@ -47,6 +47,13 @@ func Benchmark1(b *testing.B) {
 }
 
 func Test1(t *testing.T) {
+	db, err := sql.Open("sqlite", "./a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("./a")
+	defer db.Close()
+
 	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
 	defer done()
 
@@ -71,13 +78,6 @@ func Test1(t *testing.T) {
 	if e := json.Unmarshal(j, conf); e != nil {
 		t.Fatal(e)
 	}
-
-	db, err := sql.Open("sqlite", "./a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove("./a")
-	defer db.Close()
 
 	part.BeginTx(db, ctx).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
 

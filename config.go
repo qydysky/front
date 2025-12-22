@@ -178,8 +178,8 @@ func (t *Config) Run(rootCtx context.Context, logger *plog.Log) {
 
 	<-rootCtx.Done()
 	shutdownf()
-	_ = done()
 	logger.IF("%v shutdown", t.Addr)
+	_ = done()
 }
 
 func (t *Config) startServer(logger *plog.Log, conf *http.Server, retryDur time.Duration) (shutdown func(ctx ...context.Context)) {
