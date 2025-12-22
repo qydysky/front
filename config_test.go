@@ -510,9 +510,6 @@ func Test_Uri2(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	reqb := []byte("1234")
-	resb := make([]byte, 5)
-
 	pipe := reqf.NewRawReqRes()
 	r := reqf.New()
 	if e := r.Reqf(reqf.Rval{
@@ -522,6 +519,9 @@ func Test_Uri2(t *testing.T) {
 	}); e != nil {
 		t.Fatal()
 	}
+
+	reqb := []byte("1234")
+	resb := make([]byte, 5)
 	pipe.ReqWrite(reqb)
 	pipe.ReqClose()
 	n, _ := pipe.ResRead(resb)

@@ -66,7 +66,7 @@ type Blocks struct {
 // Run会创建协程，启动服务，并阻塞直到rootCtx.Done，rootCtx.Done之后，
 func (t *Config) Run(rootCtx context.Context, logger *plog.Log) {
 
-	ctx, done := pctx.WithWait(rootCtx, 0, time.Second*10)
+	ctx, done := pctx.WithWait(rootCtx, 0, time.Minute)
 
 	httpSer := http.Server{
 		Addr: t.Addr,
@@ -92,7 +92,7 @@ func (t *Config) Run(rootCtx context.Context, logger *plog.Log) {
 			errPub = r.Reqf(reqf.Rval{
 				Url: t.TLS.Pub,
 			})
-			r.Respon(func(b []byte) error {
+			_ = r.Respon(func(b []byte) error {
 				pub = b
 				return nil
 			})
@@ -108,7 +108,7 @@ func (t *Config) Run(rootCtx context.Context, logger *plog.Log) {
 			errPri = r.Reqf(reqf.Rval{
 				Url: t.TLS.Key,
 			})
-			r.Respon(func(b []byte) error {
+			_ = r.Respon(func(b []byte) error {
 				pri = b
 				return nil
 			})
@@ -253,7 +253,7 @@ func (t *Config) SwapSign(ctx context.Context, logger *plog.Log) {
 				if pather, ok := t.routeMap.Load(routePath); ok {
 					var (
 						reqBuf  *reqBufS
-						putBack = func() {}
+						putBack func()
 						err     error
 					)
 					if t.RetryBlocksI != nil {
