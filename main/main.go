@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"time"
 
 	pfront "github.com/qydysky/front"
@@ -119,6 +118,7 @@ func main() {
 		if tdb, err := sql.Open("sqlite", time.Now().Format(*dbFile)); err != nil {
 			os.Stderr.Write([]byte(err.Error()))
 		} else {
+			db.SetMaxOpenConns(1)
 			db = tdb
 			_ = psql.BeginTx(db, context.Background()).SimpleDo("create table log (date text, prefix text, base text, msgs text)").Run()
 		}
@@ -137,7 +137,7 @@ func main() {
 		}
 
 		if db != nil {
-			logger.LDB(psql.NewTxPool(db).RMutex(new(sync.RWMutex)), psql.PlaceHolderA, "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})")
+			logger.LDB(psql.NewTxPool(db), psql.PlaceHolderA, "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})")
 		}
 
 		if *noLog {
