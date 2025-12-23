@@ -361,6 +361,7 @@ func (t *Route) SwapSign(logger *plog.Log) {
 	}
 
 	for i := 0; i < len(t.Backs); i++ {
+		unlock := t.Backs[i].lock.Lock()
 		t.Backs[i].route = t
 		if p, ok := t.backMap.Load(t.Backs[i].Id()); !ok {
 			logger.IF("%v > %v > %v", t.config.Addr, t.Name, t.Backs[i].Name)
@@ -368,6 +369,7 @@ func (t *Route) SwapSign(logger *plog.Log) {
 		} else if p.(*Back) != &t.Backs[i] {
 			logger.IF("%v > %v ~ %v", t.config.Addr, t.Name, t.Backs[i].Name)
 		}
+		unlock()
 	}
 
 	t.backMap.Range(func(key, value any) bool {
