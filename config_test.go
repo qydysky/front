@@ -1065,11 +1065,9 @@ func Test_AlwaysUp(t *testing.T) {
 	defer w1.Shutdown()
 	w1.Handle(map[string]func(http.ResponseWriter, *http.Request){
 		`/`: func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte{'1'})
+			io.Copy(w, r.Body)
 		},
 	})
-
-	time.Sleep(time.Second)
 
 	conf := &Config{
 		Addr: "127.0.0.1:19000",
@@ -1100,7 +1098,8 @@ func Test_AlwaysUp(t *testing.T) {
 
 	r := reqf.New()
 	if e := r.Reqf(reqf.Rval{
-		Url: "http://127.0.0.1:19000/",
+		Url:     "http://127.0.0.1:19000/",
+		PostStr: "1",
 	}); e != nil {
 		t.Fatal(e)
 	} else {
