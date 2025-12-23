@@ -1069,6 +1069,8 @@ func Test_AlwaysUp(t *testing.T) {
 		},
 	})
 
+	time.Sleep(time.Second)
+
 	conf := &Config{
 		Addr: "127.0.0.1:19000",
 		Routes: []Route{
