@@ -134,30 +134,31 @@ func main() {
 	var interrupt = make(chan os.Signal, 2)
 	signal.Notify(interrupt, os.Interrupt)
 
+	// 日志初始化
+	logger := plog.New()
+
+	if *logFile != "" {
+		logger.LFile(*logFile)
+	}
+
+	if db != nil {
+		logger.LDB(psql.NewTxPool(db), psql.PlaceHolderA, "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})")
+	}
+
+	if *noLog {
+		logger.Level(map[plog.Level]string{})
+	}
+
+	if *noDebugLog {
+		logger.Level(map[plog.Level]string{
+			plog.I: `I:`,
+			plog.W: `W:`,
+			plog.E: `E:`,
+		})
+	}
+
 	for exit := false; !exit; {
-		// 日志初始化
-		logger := plog.New(&plog.Log{}).Base(time.Now().Format("20060102150405"))
-
-		if *logFile != "" {
-			logger.LFile(*logFile)
-		}
-
-		if db != nil {
-			logger.LDB(psql.NewTxPool(db), psql.PlaceHolderA, "insert into log (date,prefix,base,msgs) values ({Date},{Prefix},{Base},{Msgs})")
-		}
-
-		if *noLog {
-			logger.Level(map[plog.Level]string{})
-		}
-
-		if *noDebugLog {
-			logger.IF("关闭输出debug")
-			logger.Level(map[plog.Level]string{
-				plog.I: `I:`,
-				plog.W: `W:`,
-				plog.E: `E:`,
-			})
-		}
+		logger.Base(time.Now().Format("20060102150405"))
 
 		// 根ctx
 		ctx, cancle := pctx.WithWait(context.Background(), 0, time.Minute*2)
