@@ -31,6 +31,10 @@ func (echoDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		logFormat = "%v %v %v%v > %v > %v echo %v %v %v"
 	)
 
+	for v := range chosenBack.getDealerReqFunc() {
+		v.Dealer(r)
+	}
+
 	logger.TF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT))
 
 	if chosenBack.getSplicing() != 0 {
