@@ -826,6 +826,34 @@ func (t *Back) getDealerResHeader() iter.Seq[dealer.HeaderDealer] {
 		}
 	}
 }
+func (t *Back) getDealerReqFunc() iter.Seq[dealer.ReqFunc] {
+	return func(yield func(dealer.ReqFunc) bool) {
+		if t.Dealer.ReqFunc.Dealer != nil {
+			if !yield(t.Dealer.ReqFunc) {
+				return
+			}
+		}
+		if t.route.Dealer.ReqFunc.Dealer != nil {
+			if !yield(t.route.Dealer.ReqFunc) {
+				return
+			}
+		}
+	}
+}
+func (t *Back) getDealerResFunc() iter.Seq[dealer.ResFunc] {
+	return func(yield func(dealer.ResFunc) bool) {
+		if t.Dealer.ResFunc.Dealer != nil {
+			if !yield(t.Dealer.ResFunc) {
+				return
+			}
+		}
+		if t.route.Dealer.ResFunc.Dealer != nil {
+			if !yield(t.route.Dealer.ResFunc) {
+				return
+			}
+		}
+	}
+}
 func (t *Back) getDealerResBody() iter.Seq[dealer.Body] {
 	return func(yield func(dealer.Body) bool) {
 		for i := 0; i < len(t.Dealer.ResBody); i++ {

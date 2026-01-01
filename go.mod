@@ -6,17 +6,11 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/qydysky/brotli v0.0.0-20250531004300-54adcf96cc4a
-	github.com/qydysky/part v0.28.20251223185415
+	github.com/qydysky/part v0.28.20260101005913
 	golang.org/x/net v0.47.0
 )
 
-require (
-	github.com/klauspost/compress v1.18.2 // indirect
-	github.com/miekg/dns v1.1.68 // indirect
-	golang.org/x/mod v0.30.0 // indirect
-	golang.org/x/sync v0.18.0 // indirect
-	golang.org/x/tools v0.39.0 // indirect
-)
+require github.com/klauspost/compress v1.18.2 // indirect
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

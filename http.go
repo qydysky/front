@@ -55,6 +55,10 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		logFormat = "%v %v %v%v > %v > %v http %v %v %v"
 	)
 
+	for v := range chosenBack.getDealerReqFunc() {
+		v.Dealer(r)
+	}
+
 	url := chosenBack.To
 	if chosenBack.getPathAdd() {
 		url += r.RequestURI
@@ -112,6 +116,11 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 	}
 
 	resp, e = client.Do(req)
+
+	for v := range chosenBack.getDealerResFunc() {
+		v.Dealer(resp)
+	}
+
 	if e != nil && !errors.Is(e, ErrRedirect) && !errors.Is(e, context.Canceled) && !errors.Is(e, context.DeadlineExceeded) {
 		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT))
 		chosenBack.Disable()

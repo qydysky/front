@@ -44,14 +44,12 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		opT       = time.Now()
 		resp      *http.Response
 		conn      net.Conn
-		logFormat = "%v %v > %v > %v ws %v %v"
+		logFormat = "%v %v > %v > %v ws %v %v %v"
 	)
 
-	// for i := 0; i < len(backs) && (resp == nil || conn == nil); i++ {
-	// 	if !backs[i].IsLive() {
-	// 		continue
-	// 	}
-	// 	chosenBack = backs[i]
+	for v := range chosenBack.getDealerReqFunc() {
+		v.Dealer(r)
+	}
 
 	url := chosenBack.To
 	if chosenBack.getPathAdd() {
@@ -67,15 +65,15 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 	setEnvIfNot(env, `$remote_addr`, r.Header.Get("X-Real-IP"))
 	setEnvIfNot(env, `$remote_addr`, strings.Split(r.RemoteAddr, ":")[0])
 
-	// if e :=
 	copyHeader(env, r.Header, reqHeader, chosenBack.getDealerReqHeader())
-	// ; e != nil {
-	// 	logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
-	// 	return ErrDealReqHeader
-	// }
 
 	var e error
 	conn, resp, e = DialContext(ctx, url, reqHeader, chosenBack)
+
+	for v := range chosenBack.getDealerResFunc() {
+		v.Dealer(resp)
+	}
+
 	if e != nil && !errors.Is(e, context.Canceled) && !errors.Is(e, context.Canceled) && !errors.Is(e, context.DeadlineExceeded) {
 		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
 		chosenBack.Disable()
@@ -86,7 +84,6 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrResTO, time.Since(opT))
 		chosenBack.Disable()
 	}
-	// }
 
 	if pctx.Done(ctx) {
 		w.WriteHeader(http.StatusGatewayTimeout)
@@ -427,7 +424,7 @@ func DialContext(ctx context.Context, urlStr string, requestHeader http.Header, 
 		buf := make([]byte, 1024)
 		n, _ := io.ReadFull(resp.Body, buf)
 		resp.Body = io.NopCloser(bytes.NewReader(buf[:n]))
-		log.Default().Println(resp.StatusCode, resp.Header)
+		// log.Default().Println(resp.StatusCode, resp.Header)
 		return nil, resp, websocket.ErrBadHandshake
 	}
 
