@@ -213,7 +213,7 @@ setting: setting代指下述各配置
         - matchExp: string 正则表达式
         - value: int
     - resFunc:{} 返回后端响应前，调用方法(仅http、https、ws、wss时有效)
-        - dealer: func(r *http.Response) 当通过编程方式启动时，将调用注册的方法
+        - dealer: func(req *http.Request, res *http.Response) 当通过编程方式启动时，将调用注册的方法
 
 可以使用的环境变量(仅能单独使用，不能和字符串拼合等)：
 - `$remote_addr`:当存在`X-Real-IP`头时，取其值，否则取请求端的远程地址。在`dealer.reqHeader.value`、`dealer.resHeader.value`可用

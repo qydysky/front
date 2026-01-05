@@ -71,7 +71,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 	conn, resp, e = DialContext(ctx, url, reqHeader, chosenBack)
 
 	for v := range chosenBack.getDealerResFunc() {
-		v.Dealer(resp)
+		v.Dealer(r, resp)
 	}
 
 	if e != nil && !errors.Is(e, context.Canceled) && !errors.Is(e, context.Canceled) && !errors.Is(e, context.DeadlineExceeded) {

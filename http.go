@@ -118,7 +118,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 	resp, e = client.Do(req)
 
 	for v := range chosenBack.getDealerResFunc() {
-		v.Dealer(resp)
+		v.Dealer(req, resp)
 	}
 
 	if e != nil && !errors.Is(e, ErrRedirect) && !errors.Is(e, context.Canceled) && !errors.Is(e, context.DeadlineExceeded) {
