@@ -47,9 +47,9 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		logFormat = "%v %v > %v > %v ws %v %v %v"
 	)
 
-	for v := range chosenBack.getDealerReqFunc() {
-		v.Dealer(r)
-	}
+	// for v := range chosenBack.getDealerReqFunc() {
+	// 	v.Dealer(r)
+	// }
 
 	url := chosenBack.To
 	if chosenBack.getPathAdd() {
@@ -70,9 +70,9 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 	var e error
 	conn, resp, e = DialContext(ctx, url, reqHeader, chosenBack)
 
-	for v := range chosenBack.getDealerResFunc() {
-		v.Dealer(r, resp)
-	}
+	// for v := range chosenBack.getDealerResFunc() {
+	// 	v.Dealer(r, resp)
+	// }
 
 	if e != nil && !errors.Is(e, context.Canceled) && !errors.Is(e, context.Canceled) && !errors.Is(e, context.DeadlineExceeded) {
 		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
@@ -101,21 +101,24 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		return MarkRetry(ErrResFail)
 	}
 
-	var noPassFiliter bool
+	var filiterErr error
 	for filiter := range chosenBack.getFiliters() {
-		noPassFiliter = true
+		filiterErr = nil
 		if ok, e := filiter.ResHeader.Match(resp.Header); e != nil {
 			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
 		} else if !ok {
-			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, ErrHeaderCheckFail, time.Since(opT))
+			filiterErr = ErrHeaderCheckFail
 			continue
 		}
-		noPassFiliter = false
+		if filiter.ResFunc.Filiter != nil && !filiter.ResFunc.Filiter(r, resp) {
+			filiterErr = ErrFuncCheckFail
+			continue
+		}
 		break
 	}
-	if noPassFiliter {
-		// w.Header().Add(header+"Error", ErrHeaderCheckFail.Error())
-		return MarkRetry(ErrHeaderCheckFail)
+	if filiterErr != nil {
+		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, filiterErr, time.Since(opT))
+		return MarkRetry(filiterErr)
 	}
 
 	logger.TF("%v > %v > %v ws ok %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT))
