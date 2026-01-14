@@ -13,8 +13,8 @@ type Filiter struct {
 	ReqHost   Host                  `json:"reqHost"`
 	ReqUri    Uri                   `json:"reqUri"`
 	ResHeader Header                `json:"resHeader"`
-	ReqFunc   ReqFunc               `json:"reqFunc"`
-	ResFunc   ResFunc               `json:"resFunc"`
+	ReqFunc   ReqFunc               `json:"-"`
+	ResFunc   ResFunc               `json:"-"`
 }
 
 func (t *Filiter) Id() *unique.Handle[string] {
@@ -30,8 +30,8 @@ func (t *Filiter) UnmarshalJSON(b []byte) error {
 		ReqHost   Host                  `json:"reqHost"`
 		ReqUri    Uri                   `json:"reqUri"`
 		ResHeader Header                `json:"resHeader"`
-		ReqFunc   ReqFunc               `json:"reqFunc"`
-		ResFunc   ResFunc               `json:"resFunc"`
+		ReqFunc   ReqFunc               `json:"-"`
+		ResFunc   ResFunc               `json:"-"`
 	}{}
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err

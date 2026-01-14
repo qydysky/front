@@ -411,6 +411,9 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 			if ok, e := filiter.ReqHeader.Match(r.Header); !ok || e != nil {
 				continue
 			}
+			if filiter.ReqFunc.Filiter != nil && !filiter.ReqFunc.Filiter(r) {
+				continue
+			}
 			passFiliter = filiter.Id()
 			noPassFiliter = false
 			break
@@ -497,6 +500,9 @@ func (t *Route) WR(reqId uint32, routePath string, logger *plog.Log, reqBuf *req
 						continue
 					}
 					if ok, e := filiter.ReqHeader.Match(r.Header); !ok || e != nil {
+						continue
+					}
+					if filiter.ReqFunc.Filiter != nil && !filiter.ReqFunc.Filiter(r) {
 						continue
 					}
 					noPassFiliter = false
