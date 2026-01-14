@@ -637,7 +637,7 @@ func (t *Route) WR(reqId uint32, routePath string, logger *plog.Log, reqBuf *req
 			break
 		}
 
-		if v, ok := err.(ErrCanRetry); !ok || !v.CanRetry {
+		if _, ok := err.(ErrCanRetry); !ok {
 			// some err can't retry
 			break
 		} else if reqContentLength != "" && reqBuf != nil && !reqBuf.allowReuse {
