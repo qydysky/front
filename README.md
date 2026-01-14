@@ -23,17 +23,17 @@ Usage of ./main:
   -adminPort int
         adminPort, eg:10908
   -c string
-        config (default "main.json")
+        config file (default "main.json")
   -dbFile string
-        dbFile, eg./log/20060102150405.sqlite ,defalut no db File
+        dbFile, eg./log/20060102150405.sqlite
   -decrypt string
-        decrypt with pri.pem
+        decrypt stdin with pri.pem, and output stdout
   -encrypt string
-        encrypt with pub.pem
+        encrypt stdin with pub.pem, and output stdout
   -genKey
         gen new pub.pem and pri.pem
   -logFile string
-        logFile, defalut no log file
+        logFile
   -noDebugLog
         noDebugLog
   -noLog
@@ -187,6 +187,10 @@ setting: setting代指下述各配置
         - action: string 可选`access`、`deny`
         - reqSize: string 限定请求数据大小，默认为`1M`
         - matchExp: string `access`时如不匹配将结束请求。`deny`时如匹配将结束请求
+    - reqFunc:{} 请求后端前，调用方法
+        - filiter: func(r *http.Request)(pass bool) 当通过编程方式启动时，将调用注册的方法
+    - resFunc:{} 返回后端响应前，调用方法(仅http、https、ws、wss时有效)
+        - filiter: func(req *http.Request, res *http.Response)(pass bool) 当通过编程方式启动时，将调用注册的方法
 
 - dealer: {}
     - reqUri:[] 请求后端前，路径处理器
@@ -198,8 +202,6 @@ setting: setting代指下述各配置
         - key: string 具体处理哪个头
         - matchExp: string `replace`时结合value进行替换
         - value: string `replace`时结合matchExp进行替换。add时将附加值。`set`时将覆盖值。
-    - reqFunc:{} 请求后端前，调用方法
-        - dealer: func(r *http.Request) 当通过编程方式启动时，将调用注册的方法
     - resHeader:[] 返回后端的响应前，请求头处理器
         - action: string 可选`add`、`del`、`set`。
         - key: string 具体处理哪个头
@@ -212,8 +214,6 @@ setting: setting代指下述各配置
     - resStatus:{} 返回后端响应前，修改响应码(仅to为空、http、https时有效)
         - matchExp: string 正则表达式
         - value: int
-    - resFunc:{} 返回后端响应前，调用方法(仅http、https、ws、wss时有效)
-        - dealer: func(req *http.Request, res *http.Response) 当通过编程方式启动时，将调用注册的方法
 
 可以使用的环境变量(仅能单独使用，不能和字符串拼合等)：
 - `$remote_addr`:当存在`X-Real-IP`头时，取其值，否则取请求端的远程地址。在`dealer.reqHeader.value`、`dealer.resHeader.value`可用

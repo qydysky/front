@@ -161,6 +161,7 @@ var (
 	ErrCheckFail         = errors.New("ErrCheckFail")
 	ErrPatherCheckFail   = errors.New("ErrPatherCheckFail")
 	ErrHeaderCheckFail   = errors.New("ErrHeaderCheckFail")
+	ErrFuncCheckFail     = errors.New("ErrFuncCheckFail")
 	ErrBodyCheckFail     = errors.New("ErrBodyCheckFail")
 	ErrAllBacksFail      = errors.New("ErrAllBacksFail")
 	ErrBackFail          = errors.New("ErrBackFail")

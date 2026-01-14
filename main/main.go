@@ -34,9 +34,9 @@ func main() {
 
 	// 获取config路径
 	var (
-		configP    = flag.String("c", "main.json", "config")
-		dbFile     = flag.String("dbFile", "", "dbFile, eg./log/20060102150405.sqlite ,defalut no db File")
-		logFile    = flag.String("logFile", "", "logFile, defalut no log file")
+		configP    = flag.String("c", "main.json", "config file")
+		dbFile     = flag.String("dbFile", "", "dbFile, eg./log/20060102150405.sqlite")
+		logFile    = flag.String("logFile", "", "logFile")
 		adminPort  = flag.Int("adminPort", 0, "adminPort, eg:10908")
 		adminPath  = flag.String("adminPath", "", "adminPath, eg:/123/12/")
 		reload     = flag.Bool("reload", false, "reload, when adminPort/adminPath set")
@@ -45,8 +45,8 @@ func main() {
 		noLog      = flag.Bool("noLog", false, "noLog")
 		noDebugLog = flag.Bool("noDebugLog", false, "noDebugLog")
 		genKey     = flag.Bool("genKey", false, "gen new pub.pem and pri.pem")
-		decrypt    = flag.String("decrypt", "", "decrypt with pri.pem")
-		encrypt    = flag.String("encrypt", "", "encrypt with pub.pem")
+		decrypt    = flag.String("decrypt", "", "decrypt stdin with pri.pem, and output stdout")
+		encrypt    = flag.String("encrypt", "", "encrypt stdin with pub.pem, and output stdout")
 	)
 	flag.Parse()
 

@@ -36,9 +36,9 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 		logFormat = "%v %v %v%v > %v > %v local %v %v %v"
 	)
 
-	for v := range chosenBack.getDealerReqFunc() {
-		v.Dealer(r)
-	}
+	// for v := range chosenBack.getDealerReqFunc() {
+	// 	v.Dealer(r)
+	// }
 
 	path := chosenBack.To
 	if chosenBack.getPathAdd() {

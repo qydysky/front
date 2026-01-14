@@ -285,7 +285,7 @@ func (t *Config) SwapSign(ctx context.Context, logger *plog.Log) {
 						return
 					case errors.Is(err, context.DeadlineExceeded):
 						return
-					case errors.Is(err, ErrHeaderCheckFail), errors.Is(err, ErrBodyCheckFail), errors.Is(err, ErrCheckFail):
+					case errors.Is(err, ErrHeaderCheckFail), errors.Is(err, ErrBodyCheckFail), errors.Is(err, ErrCheckFail), errors.Is(err, ErrFuncCheckFail):
 						w.WriteHeader(http.StatusForbidden)
 					default:
 						w.WriteHeader(http.StatusNotFound)
@@ -318,13 +318,11 @@ func (t *Config) SwapSign(ctx context.Context, logger *plog.Log) {
 
 type ErrCanRetry struct {
 	error
-	CanRetry bool
 }
 
 func MarkRetry(e error) error {
 	return ErrCanRetry{
-		error:    e,
-		CanRetry: true,
+		error: e,
 	}
 }
 
@@ -463,6 +461,10 @@ func (t *Route) WR(reqId uint32, routePath string, logger *plog.Log, reqBuf *req
 		if ok, e := filiter.ReqBody.Match(r); e != nil {
 			logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", e)
 		} else if !ok {
+			continue
+		}
+
+		if filiter.ReqFunc.Filiter != nil && !filiter.ReqFunc.Filiter(r) {
 			continue
 		}
 		noPassFiliter = false
@@ -635,7 +637,7 @@ func (t *Route) WR(reqId uint32, routePath string, logger *plog.Log, reqBuf *req
 			break
 		}
 
-		if v, ok := err.(ErrCanRetry); !ok || !v.CanRetry {
+		if _, ok := err.(ErrCanRetry); !ok {
 			// some err can't retry
 			break
 		} else if reqContentLength != "" && reqBuf != nil && !reqBuf.allowReuse {
@@ -826,34 +828,36 @@ func (t *Back) getDealerResHeader() iter.Seq[dealer.HeaderDealer] {
 		}
 	}
 }
-func (t *Back) getDealerReqFunc() iter.Seq[dealer.ReqFunc] {
-	return func(yield func(dealer.ReqFunc) bool) {
-		if t.Dealer.ReqFunc.Dealer != nil {
-			if !yield(t.Dealer.ReqFunc) {
-				return
-			}
-		}
-		if t.route.Dealer.ReqFunc.Dealer != nil {
-			if !yield(t.route.Dealer.ReqFunc) {
-				return
-			}
-		}
-	}
-}
-func (t *Back) getDealerResFunc() iter.Seq[dealer.ResFunc] {
-	return func(yield func(dealer.ResFunc) bool) {
-		if t.Dealer.ResFunc.Dealer != nil {
-			if !yield(t.Dealer.ResFunc) {
-				return
-			}
-		}
-		if t.route.Dealer.ResFunc.Dealer != nil {
-			if !yield(t.route.Dealer.ResFunc) {
-				return
-			}
-		}
-	}
-}
+
+//	func (t *Back) getDealerReqFunc() iter.Seq[dealer.ReqFunc] {
+//		return func(yield func(dealer.ReqFunc) bool) {
+//			if t.Dealer.ReqFunc.Dealer != nil {
+//				if !yield(t.Dealer.ReqFunc) {
+//					return
+//				}
+//			}
+//			if t.route.Dealer.ReqFunc.Dealer != nil {
+//				if !yield(t.route.Dealer.ReqFunc) {
+//					return
+//				}
+//			}
+//		}
+//	}
+//
+//	func (t *Back) getDealerResFunc() iter.Seq[dealer.ResFunc] {
+//		return func(yield func(dealer.ResFunc) bool) {
+//			if t.Dealer.ResFunc.Dealer != nil {
+//				if !yield(t.Dealer.ResFunc) {
+//					return
+//				}
+//			}
+//			if t.route.Dealer.ResFunc.Dealer != nil {
+//				if !yield(t.route.Dealer.ResFunc) {
+//					return
+//				}
+//			}
+//		}
+//	}
 func (t *Back) getDealerResBody() iter.Seq[dealer.Body] {
 	return func(yield func(dealer.Body) bool) {
 		for i := 0; i < len(t.Dealer.ResBody); i++ {
