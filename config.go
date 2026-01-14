@@ -672,9 +672,10 @@ type Back struct {
 
 	lastResDru time.Duration `json:"-"`
 
-	Name   string `json:"name"`
-	To     string `json:"to"`
-	Weight uint   `json:"weight,string"`
+	Name     string `json:"name"`
+	To       string `json:"to"`
+	Weight   uint   `json:"weight,string"`
+	AlwaysUp bool   `json:"alwaysUp"`
 
 	Setting
 }
@@ -923,8 +924,11 @@ func (t *Back) IsLive() bool {
 }
 
 func (t *Back) Disable() {
-	now := time.Now()
 	defer t.lock.RLock()()
+	if t.AlwaysUp {
+		return
+	}
+	now := time.Now()
 	t.DisableC += 1
 	t.LastFailT = now
 	if tmp := t.getErrBanSec(); tmp > 0 {

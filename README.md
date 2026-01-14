@@ -142,6 +142,7 @@ config:
             - 含有`://`时，例`s://www.baidu.com`，会根据客户端自动添加http or ws在地址前
             - 不含`://`时，将会尝试解析成本地文件，当指向zip文件，将尝试读取
         - weight: string uint 权重，按routes中的全部back的权重比分配，当权重为0时，将停止新请求的进入
+        - alwaysUp: bool 总是在线
         - setting...
 
 setting: setting代指下述各配置
