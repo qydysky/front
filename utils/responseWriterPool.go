@@ -17,6 +17,7 @@ func (t *responseWriter) Header() http.Header {
 }
 
 func (t *responseWriter) Write(b []byte) (int, error) {
+	t.writen.Store(true)
 	return t.Raw.Write(b)
 }
 
