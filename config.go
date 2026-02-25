@@ -23,6 +23,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/qydysky/front/dealer"
 	filiter "github.com/qydysky/front/filiter"
+	utils "github.com/qydysky/front/utils"
 	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
 	pe "github.com/qydysky/part/errors"
@@ -234,11 +235,15 @@ func (t *Config) SwapSign(ctx context.Context, logger *plog.Log) {
 			pather.Add(route)
 
 			route.SwapSign(logger)
-			t.webpath.StoreIfNotExist(routePath, func(w http.ResponseWriter, r *http.Request) {
+			t.webpath.StoreIfNotExist(routePath, func(rawW http.ResponseWriter, r *http.Request) {
 				reqId := t.reqId.Add(1)
 				if reqId >= uint32(t.ReqIdLoop) {
 					t.reqId.Store(0)
 				}
+
+				w := utils.RWPool.Get()
+				defer utils.RWPool.Put(w)
+				w.Raw = rawW
 
 				var (
 					logFormat = "%d %v %v%v %v %v"
@@ -284,7 +289,7 @@ func (t *Config) SwapSign(ctx context.Context, logger *plog.Log) {
 					case err == nil:
 						return
 					case errors.Is(err, context.DeadlineExceeded):
-						return
+						w.WriteHeader(http.StatusGatewayTimeout)
 					case errors.Is(err, ErrHeaderCheckFail), errors.Is(err, ErrBodyCheckFail), errors.Is(err, ErrCheckFail), errors.Is(err, ErrFuncCheckFail):
 						w.WriteHeader(http.StatusForbidden)
 					default:

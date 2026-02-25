@@ -1274,11 +1274,15 @@ func Test_TO(t *testing.T) {
 		if r.ResStatusCode() != http.StatusGatewayTimeout {
 			t.Fatal(e)
 		}
+	} else {
+		t.Fatal()
 	}
 	if e := r.Reqf(reqf.Rval{
 		Url: "http://127.0.0.1:19000/2",
 	}); e != nil {
-		if r.ResStatusCode() != http.StatusGatewayTimeout {
+		t.Fatal()
+	} else {
+		if r.ResStatusCode() != http.StatusOK {
 			t.Fatal(e)
 		}
 	}

@@ -133,7 +133,6 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 	}
 
 	if pctx.Done(ctx) {
-		w.WriteHeader(http.StatusGatewayTimeout)
 		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, context.DeadlineExceeded, time.Since(opT))
 		chosenBack.Disable()
 		return context.DeadlineExceeded
