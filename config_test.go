@@ -1289,12 +1289,12 @@ func Test_Filiter(t *testing.T) {
 	if e := r.Reqf(reqf.Rval{
 		Url: "http://127.0.0.1:19000/",
 		Header: map[string]string{
-			"X-P-A": "1",
+			"X-P-B": "1",
 		},
 	}); e != nil {
 		t.Fatal(e)
 	} else if r.ResStatusCode() != 202 {
-		t.Fatal()
+		t.Fatal(r.ResStatusCode())
 	}
 	if e := r.Reqf(reqf.Rval{
 		Url: "http://127.0.0.1:19000/",
