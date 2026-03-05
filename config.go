@@ -756,13 +756,13 @@ func (t *Back) getVerifyPeerCer() (cer []byte, e error) {
 }
 func (t *Back) getFiliters() (f iter.Seq[*filiter.Filiter]) {
 	return func(yield func(*filiter.Filiter) bool) {
-		// for i := 0; i < len(t.route.Filiters); i++ {
-		// 	if !yield(t.route.Filiters[i]) {
-		// 		return
-		// 	}
-		// }
 		for i := 0; i < len(t.Filiters); i++ {
 			if !yield(t.Filiters[i]) {
+				return
+			}
+		}
+		for i := 0; i < len(t.route.Filiters); i++ {
+			if !yield(t.route.Filiters[i]) {
 				return
 			}
 		}

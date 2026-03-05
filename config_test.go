@@ -472,6 +472,88 @@ func Test_Uri3(t *testing.T) {
 	})
 }
 
+func Test_Uri8(t *testing.T) {
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
+
+	pass1 := false
+	pass2 := false
+	web := pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	})
+	web.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/test/`: func(w http.ResponseWriter, r *http.Request) {
+			io.Copy(w, r.Body)
+		},
+	})
+
+	defer web.Shutdown()
+
+	conf := &Config{
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path: []string{"/test/"},
+				Setting: Setting{
+					PathAdd: true,
+					Filiters: []*filiter.Filiter{{
+						ResFunc: filiter.ResFunc{
+							Filiter: func(req *http.Request, res *http.Response) (pass bool) {
+								pass1 = true
+								return true
+							},
+						},
+					}},
+				},
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+						Setting: Setting{
+							Filiters: []*filiter.Filiter{{
+								ResFunc: filiter.ResFunc{
+									Filiter: func(req *http.Request, res *http.Response) (pass bool) {
+										pass2 = true
+										return true
+									},
+								},
+							}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	go conf.Run(ctx, logger)
+
+	time.Sleep(time.Second)
+
+	pipe := reqf.NewRawReqRes()
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url:     "http://127.0.0.1:19000/test/",
+		RawPipe: pipe,
+		Async:   true,
+	}); e != nil {
+		t.Fatal()
+	}
+
+	reqb := []byte("1234")
+	resb := make([]byte, 5)
+	pipe.ReqWrite(reqb)
+	pipe.ReqClose()
+	n, _ := pipe.ResRead(resb)
+	resb = resb[:n]
+	if !bytes.Equal(resb, reqb) {
+		t.Fatal(string(resb))
+	}
+	if pass1 || !pass2 {
+		t.Fatal()
+	}
+}
+
 func Test_Uri2(t *testing.T) {
 	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
 	defer done()
