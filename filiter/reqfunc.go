@@ -2,6 +2,4 @@ package filiter
 
 import "net/http"
 
-type ReqFunc struct {
-	Filiter func(r *http.Request) (pass bool)
-}
+type ReqFunc func(r *http.Request) (pass bool)

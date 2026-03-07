@@ -258,7 +258,7 @@ func Test_Uri7(t *testing.T) {
 	web.Handle(map[string]func(http.ResponseWriter, *http.Request){
 		`/test/`: func(w http.ResponseWriter, r *http.Request) {
 			if once.CompareAndSwap(false, true) {
-				time.Sleep(time.Second * 10)
+				time.Sleep(time.Second * 5)
 			}
 			io.Copy(w, r.Body)
 		},
@@ -497,11 +497,9 @@ func Test_Uri8(t *testing.T) {
 				Setting: Setting{
 					PathAdd: true,
 					Filiters: []*filiter.Filiter{{
-						ResFunc: filiter.ResFunc{
-							Filiter: func(req *http.Request, res *http.Response) (pass bool) {
-								pass1 = true
-								return true
-							},
+						ResFunc: func(req *http.Request, res *http.Response) (pass bool) {
+							pass1 = true
+							return true
 						},
 					}},
 				},
@@ -512,11 +510,9 @@ func Test_Uri8(t *testing.T) {
 						Weight: 1,
 						Setting: Setting{
 							Filiters: []*filiter.Filiter{{
-								ResFunc: filiter.ResFunc{
-									Filiter: func(req *http.Request, res *http.Response) (pass bool) {
-										pass2 = true
-										return true
-									},
+								ResFunc: func(req *http.Request, res *http.Response) (pass bool) {
+									pass2 = true
+									return true
 								},
 							}},
 						},
@@ -552,6 +548,159 @@ func Test_Uri8(t *testing.T) {
 	if pass1 || !pass2 {
 		t.Fatal()
 	}
+}
+
+func Test2(t *testing.T) {
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
+
+	pass1 := false
+	pass2 := false
+	web := pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	})
+	web.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/test/`: func(w http.ResponseWriter, r *http.Request) {
+			io.Copy(w, r.Body)
+		},
+	})
+
+	defer web.Shutdown()
+
+	conf := &Config{
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path: []string{"/test/"},
+				Setting: Setting{
+					PathAdd: true,
+					Filiters: []*filiter.Filiter{{
+						ResFunc: func(req *http.Request, res *http.Response) (pass bool) {
+							pass1 = true
+							return true
+						},
+					}},
+				},
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+						Setting: Setting{
+							Filiters: []*filiter.Filiter{{
+								ResFunc: func(req *http.Request, res *http.Response) (pass bool) {
+									pass2 = true
+									return true
+								},
+							}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	go conf.Run(ctx, logger)
+
+	time.Sleep(time.Second)
+
+	pipe := reqf.NewRawReqRes()
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url:     "http://127.0.0.1:19000/test/",
+		RawPipe: pipe,
+		Async:   true,
+	}); e != nil {
+		t.Fatal()
+	}
+
+	reqb := []byte("1234")
+	resb := make([]byte, 5)
+	pipe.ReqWrite(reqb)
+	pipe.ReqClose()
+	n, _ := pipe.ResRead(resb)
+	resb = resb[:n]
+	if !bytes.Equal(resb, reqb) {
+		t.Fatal(string(resb))
+	}
+	if pass1 || !pass2 {
+		t.Fatal()
+	}
+}
+
+func Test3(t *testing.T) {
+	ctx, done := pctx.WithWait(t.Context(), 0, time.Minute)
+	defer done()
+
+	web := pweb.New(&http.Server{
+		Addr: "127.0.0.1:19001",
+	})
+	web.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/test/`: func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(r.Header.Get("X-Real-Ip")))
+		},
+	})
+
+	defer web.Shutdown()
+
+	conf := &Config{
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path: []string{"/test/"},
+				Setting: Setting{
+					PathAdd: true,
+				},
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+						Setting: Setting{
+							Dealer: dealer.Dealer{
+								ReqHeader: []dealer.HeaderDealer{{
+									Key:    "X-Real-IP",
+									Action: "set",
+									Value:  "$remote_addr",
+								}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	go conf.Run(ctx, logger)
+
+	time.Sleep(time.Second)
+
+	r := reqf.New()
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/test/",
+	}); e != nil {
+		t.Fatal()
+	}
+	r.Respon(func(b []byte) error {
+		if !bytes.Equal(b, []byte("127.0.0.1")) {
+			t.Fatal()
+		}
+		return nil
+	})
+	if e := r.Reqf(reqf.Rval{
+		Url: "http://127.0.0.1:19000/test/",
+		Header: map[string]string{
+			"X-Real-IP": "10.0.0.1",
+		},
+	}); e != nil {
+		t.Fatal()
+	}
+	r.Respon(func(b []byte) error {
+		if !bytes.Equal(b, []byte("10.0.0.1")) {
+			t.Fatal()
+		}
+		return nil
+	})
 }
 
 func Test_Uri2(t *testing.T) {
