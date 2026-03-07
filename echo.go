@@ -54,6 +54,7 @@ func (echoDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	setEnvIfNot(env, `$remote_addr`, r.Header.Get("X-Real-IP"))
 	setEnvIfNot(env, `$remote_addr`, strings.Split(r.RemoteAddr, ":")[0])
+	setEnvIfNot(env, `$act_remote_addr`, strings.Split(r.RemoteAddr, ":")[0])
 
 	copyHeader(env, http.Header{}, w.Header(), chosenBack.getDealerResHeader())
 

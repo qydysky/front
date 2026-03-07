@@ -188,10 +188,8 @@ setting: setting代指下述各配置
         - action: string 可选`access`、`deny`
         - reqSize: string 限定请求数据大小，默认为`1M`
         - matchExp: string `access`时如不匹配将结束请求。`deny`时如匹配将结束请求
-    - reqFunc:{} 请求后端前，调用方法
-        - filiter: func(r *http.Request)(pass bool) 当通过编程方式启动时，将调用注册的方法
-    - resFunc:{} 返回后端响应前，调用方法(仅http、https、ws、wss时有效)
-        - filiter: func(req *http.Request, res *http.Response)(pass bool) 当通过编程方式启动时，将调用注册的方法
+    - reqFunc:func(r *http.Request)(pass bool) 当通过编程方式启动时，请求后端前，将调用注册的方法
+    - resFunc:func(req *http.Request, res *http.Response)(pass bool) 当通过编程方式启动时，返回后端响应前，调用方法(仅http、https、ws、wss时有效)
 
 - dealer: {}
     - reqUri:[] 请求后端前，路径处理器
@@ -218,3 +216,4 @@ setting: setting代指下述各配置
 
 可以使用的环境变量(仅能单独使用，不能和字符串拼合等)：
 - `$remote_addr`:当存在`X-Real-IP`头时，取其值，否则取请求端的远程地址。在`dealer.reqHeader.value`、`dealer.resHeader.value`可用
+- `$act_remote_addr`:取请求端的远程地址。在`dealer.reqHeader.value`、`dealer.resHeader.value`可用

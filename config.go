@@ -416,7 +416,7 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 			if ok, e := filiter.ReqHeader.Match(r.Header); !ok || e != nil {
 				continue
 			}
-			if filiter.ReqFunc.Filiter != nil && !filiter.ReqFunc.Filiter(r) {
+			if filiter.ReqFunc != nil && !filiter.ReqFunc(r) {
 				continue
 			}
 			passFiliter = filiter.Id()
@@ -472,7 +472,7 @@ func (t *Route) WR(reqId uint32, routePath string, logger *plog.Log, reqBuf *req
 			continue
 		}
 
-		if filiter.ReqFunc.Filiter != nil && !filiter.ReqFunc.Filiter(r) {
+		if filiter.ReqFunc != nil && !filiter.ReqFunc(r) {
 			continue
 		}
 		noPassFiliter = false
@@ -507,7 +507,7 @@ func (t *Route) WR(reqId uint32, routePath string, logger *plog.Log, reqBuf *req
 					if ok, e := filiter.ReqHeader.Match(r.Header); !ok || e != nil {
 						continue
 					}
-					if filiter.ReqFunc.Filiter != nil && !filiter.ReqFunc.Filiter(r) {
+					if filiter.ReqFunc != nil && !filiter.ReqFunc(r) {
 						continue
 					}
 					noPassFiliter = false

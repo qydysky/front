@@ -64,6 +64,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 
 	setEnvIfNot(env, `$remote_addr`, r.Header.Get("X-Real-IP"))
 	setEnvIfNot(env, `$remote_addr`, strings.Split(r.RemoteAddr, ":")[0])
+	setEnvIfNot(env, `$act_remote_addr`, strings.Split(r.RemoteAddr, ":")[0])
 
 	copyHeader(env, r.Header, reqHeader, chosenBack.getDealerReqHeader())
 
@@ -109,7 +110,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 			filiterErr = ErrHeaderCheckFail
 			continue
 		}
-		if filiter.ResFunc.Filiter != nil && !filiter.ResFunc.Filiter(r, resp) {
+		if filiter.ResFunc != nil && !filiter.ResFunc(r, resp) {
 			filiterErr = ErrFuncCheckFail
 			continue
 		}
