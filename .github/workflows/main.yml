@@ -45,6 +45,7 @@ jobs:
         CGO_ENABLED=0 go build -pgo=auto -v -buildmode=exe main.go
       
     - name: Upload a Build Artifact
+      if: github.event_name == 'push'
       uses: actions/upload-artifact@v4
       with:
         name: ubuntu_go${{ matrix.go }}.zip
@@ -79,6 +80,7 @@ jobs:
         go build -pgo=auto -v -buildmode=exe main.go
         
     - name: Upload a Build Artifact
+      if: github.event_name == 'push'
       uses: actions/upload-artifact@v4
       with:
         name: windows_go${{ matrix.go }}.zip
@@ -113,6 +115,7 @@ jobs:
         go build -pgo=auto -v -buildmode=exe main.go
         
     - name: Upload a Build Artifact
+      if: github.event_name == 'push'
       uses: actions/upload-artifact@v4
       with:
         name: macos_go${{ matrix.go }}.zip
@@ -139,6 +142,7 @@ jobs:
         echo "HASH=$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_ENV
 
     - name: Upload a Release Asset
+      if: github.event_name == 'push'
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v0.1.${{ env.TIME }}

@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -22,6 +21,7 @@ import (
 	utils "github.com/qydysky/front/utils"
 	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
+	errors "github.com/qydysky/part/errors"
 	plog "github.com/qydysky/part/log/v2"
 	pool "github.com/qydysky/part/pool"
 	"golang.org/x/net/proxy"
@@ -154,7 +154,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 	// }
 
 	if req, e := Upgrade(w, r, resHeader); e != nil {
-		return MarkRetry(ErrResDoFail)
+		return MarkRetry(errors.Join(ErrResDoFail, e))
 	} else {
 		defer req.Close()
 
