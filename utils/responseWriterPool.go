@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"bufio"
+	"errors"
+	"net"
 	"net/http"
 	"sync/atomic"
 
@@ -24,6 +27,16 @@ func (t *responseWriter) Write(b []byte) (int, error) {
 func (t *responseWriter) WriteHeader(statusCode int) {
 	if t.writen.CompareAndSwap(false, true) {
 		t.Raw.WriteHeader(statusCode)
+	}
+}
+
+var ErrNoImplementHijack = errors.New("ErrNoImplementHijack")
+
+func (t *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h, ok := t.Raw.(http.Hijacker); ok {
+		return h.Hijack()
+	} else {
+		return nil, nil, ErrNoImplementHijack
 	}
 }
 

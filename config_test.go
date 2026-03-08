@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -21,10 +22,110 @@ import (
 	reqf "github.com/qydysky/part/reqf"
 	part "github.com/qydysky/part/sql"
 	pweb "github.com/qydysky/part/web"
+	pws "github.com/qydysky/part/websocket"
 	_ "modernc.org/sqlite"
 )
 
 var logger = plog.New(&plog.Log{})
+
+func Test7(t *testing.T) {
+	webs := pweb.New(&http.Server{Addr: "127.0.0.1:19001"})
+	defer webs.Shutdown()
+
+	ser := pws.NewServer()
+	webs.Handle(map[string]func(http.ResponseWriter, *http.Request){
+		`/ws/`: func(w http.ResponseWriter, r *http.Request) {
+			id := ser.WS(w, r)
+			<-id
+			<-id
+		},
+	})
+
+	ws_mq := ser.Interface()
+	ws_mq.Pull_tag(map[string]func(pws.Uinterface) bool{
+		// 新连接建立
+		`init`: func(u pws.Uinterface) bool {
+			fmt.Println(u.Id, "connected!")
+			return false
+		},
+		`error`: func(u pws.Uinterface) bool {
+			fmt.Println(u.Id, u.Err)
+
+			ws_mq.Push_tag(`send`, pws.Uinterface{
+				Id:   u.Id,
+				Data: []byte("send something"),
+			})
+			ws_mq.Push_tag(`close`, pws.Uinterface{
+				Id: u.Id,
+			})
+			return false
+		},
+		// 从客户端接收数据
+		`recv`: func(u pws.Uinterface) bool {
+			t.Log(u.Id, `=>`, string(u.Data))
+			return false
+		},
+		// 连接断开
+		`fin`: func(u pws.Uinterface) bool {
+			fmt.Println(u.Id, "fin!")
+			return false
+		},
+	})
+
+	conf := &Config{
+		Addr: "127.0.0.1:19000",
+		Routes: []Route{
+			{
+				Path: []string{"/ws/"},
+				Setting: Setting{
+					PathAdd: true,
+				},
+				Backs: []Back{
+					{
+						Name:   "1",
+						To:     "://127.0.0.1:19001",
+						Weight: 1,
+					},
+				},
+			},
+		},
+	}
+
+	ctx, cancle := context.WithCancel(context.Background())
+	defer cancle()
+	go conf.Run(ctx, logger)
+
+	time.Sleep(time.Second)
+
+	cli, _ := pws.NewClient(&pws.Client{
+		Url: "ws://127.0.0.1:19000/ws/",
+	})
+	defer cli.Close()
+
+	msg, e := cli.Handle()
+	if e != nil {
+		t.Fatal(e)
+	}
+	msg.Pull_tag_only(`recv`, func(wm *pws.WsMsg) (disable bool) {
+		wm.Msg(func(b []byte) error {
+			fmt.Println(string(b))
+			return nil
+		})
+		return false
+	})
+	msg.Push_tag(`send`, &pws.WsMsg{
+		Msg: func(f func([]byte) error) error {
+			return f([]byte("message"))
+		},
+	})
+}
+
+func Test6(t *testing.T) {
+	var e = io.EOF
+	if err, ok := MarkRetry(e).(ErrCanRetry); !ok || err != io.EOF {
+		t.Fatal()
+	}
+}
 
 func Test5(t *testing.T) {
 	t.Log(time.Now().Format("20060102150405.sqlite3"))

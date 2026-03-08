@@ -5,7 +5,8 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/pem"
-	"errors"
+
+	// "errors"
 	"fmt"
 	"io"
 	"iter"
@@ -26,7 +27,7 @@ import (
 	utils "github.com/qydysky/front/utils"
 	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
-	pe "github.com/qydysky/part/errors"
+	errors "github.com/qydysky/part/errors"
 	pfile "github.com/qydysky/part/file"
 	pio "github.com/qydysky/part/io"
 	plog "github.com/qydysky/part/log/v2"
@@ -321,14 +322,10 @@ func (t *Config) SwapSign(ctx context.Context, logger *plog.Log) {
 
 }
 
-type ErrCanRetry struct {
-	error
-}
+type ErrCanRetry error
 
 func MarkRetry(e error) error {
-	return ErrCanRetry{
-		error: e,
-	}
+	return ErrCanRetry(e)
 }
 
 type Route struct {
@@ -656,11 +653,11 @@ func (t *Route) WR(reqId uint32, routePath string, logger *plog.Log, reqBuf *req
 			break
 		}
 
-		logger.TF(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backP.Name, "ErrCanRetry", pe.ErrorFormat(err, pe.ErrActionInLineFunc))
+		logger.TF(logFormatWithName, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, backP.Name, "ErrCanRetry", errors.ErrorFormat(err, errors.ErrInLineFunc))
 	}
 
 	if err != nil {
-		logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", pe.ErrorFormat(err, pe.ErrActionInLineFunc))
+		logger.WF(logFormat, reqId, r.RemoteAddr, t.config.Addr, routePath, t.Name, "Err", errors.ErrorFormat(err, errors.ErrActionInLineFunc))
 	}
 	return
 }
