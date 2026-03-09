@@ -52,7 +52,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		env       = make(map[string]string)
 		opT       = time.Now()
 		resp      *http.Response
-		logFormat = "%v %v %v%v > %v > %v http %v %v %v"
+		logFormat = "%v %v %v%v > %v > %v http %v %v %v" // "%v %v %v%v > %v > %v http %v %v %v"
 	)
 
 	// for v := range chosenBack.getDealerReqFunc() {
