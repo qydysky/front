@@ -44,7 +44,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		opT       = time.Now()
 		resp      *http.Response
 		conn      net.Conn
-		logFormat = "%v %v > %v > %v ws %v %v %v"
+		logFormat = "%v %v > %v > %v ws %v %v %v" // "%v %v > %v > %v ws %v %v %v"
 	)
 
 	// for v := range chosenBack.getDealerReqFunc() {
@@ -121,7 +121,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		return MarkRetry(filiterErr)
 	}
 
-	logger.TF("%v > %v > %v ws ok %v", chosenBack.route.config.Addr, routePath, chosenBack.Name, time.Since(opT))
+	logger.TF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, "ok", time.Since(opT))
 
 	if chosenBack.route.RollRule != `` {
 		chosenBack.be(opT)
