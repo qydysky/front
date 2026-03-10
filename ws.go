@@ -110,7 +110,9 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 			filiterErr = ErrHeaderCheckFail
 			continue
 		}
-		if filiter.ResFunc != nil && !filiter.ResFunc(r, resp) {
+		if ok, e := filiter.ResFunc.Match(r, resp); e != nil {
+			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
+		} else if !ok {
 			filiterErr = ErrFuncCheckFail
 			continue
 		}
