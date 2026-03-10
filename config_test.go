@@ -598,9 +598,14 @@ func Test_Uri8(t *testing.T) {
 				Setting: Setting{
 					PathAdd: true,
 					Filiters: []*filiter.Filiter{{
-						ResFunc: func(req *http.Request, res *http.Response) (pass bool) {
-							pass1 = true
-							return true
+						ResFunc: filiter.ResFunc{
+							AccessRule: "{a}",
+							Items: map[string]func(req *http.Request, res *http.Response) (pass bool){
+								"a": func(req *http.Request, res *http.Response) (pass bool) {
+									pass1 = true
+									return true
+								},
+							},
 						},
 					}},
 				},
@@ -611,9 +616,14 @@ func Test_Uri8(t *testing.T) {
 						Weight: 1,
 						Setting: Setting{
 							Filiters: []*filiter.Filiter{{
-								ResFunc: func(req *http.Request, res *http.Response) (pass bool) {
-									pass2 = true
-									return true
+								ResFunc: filiter.ResFunc{
+									AccessRule: "{a}",
+									Items: map[string]func(req *http.Request, res *http.Response) (pass bool){
+										"a": func(req *http.Request, res *http.Response) (pass bool) {
+											pass2 = true
+											return true
+										},
+									},
 								},
 							}},
 						},
@@ -676,9 +686,14 @@ func Test2(t *testing.T) {
 				Setting: Setting{
 					PathAdd: true,
 					Filiters: []*filiter.Filiter{{
-						ResFunc: func(req *http.Request, res *http.Response) (pass bool) {
-							pass1 = true
-							return true
+						ResFunc: filiter.ResFunc{
+							AccessRule: "{a}",
+							Items: map[string]func(req *http.Request, res *http.Response) (pass bool){
+								"a": func(req *http.Request, res *http.Response) (pass bool) {
+									pass1 = true
+									return true
+								},
+							},
 						},
 					}},
 				},
@@ -688,12 +703,19 @@ func Test2(t *testing.T) {
 						To:     "://127.0.0.1:19001",
 						Weight: 1,
 						Setting: Setting{
-							Filiters: []*filiter.Filiter{{
-								ResFunc: func(req *http.Request, res *http.Response) (pass bool) {
-									pass2 = true
-									return true
+							Filiters: []*filiter.Filiter{
+								{
+									ResFunc: filiter.ResFunc{
+										AccessRule: "{a}",
+										Items: map[string]func(req *http.Request, res *http.Response) (pass bool){
+											"a": func(req *http.Request, res *http.Response) (pass bool) {
+												pass2 = true
+												return true
+											},
+										},
+									},
 								},
-							}},
+							},
 						},
 					},
 				},

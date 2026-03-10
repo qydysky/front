@@ -158,7 +158,9 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 			filiterErr = ErrHeaderCheckFail
 			continue
 		}
-		if filiter.ResFunc != nil && !filiter.ResFunc(r, resp) {
+		if ok, e := filiter.ResFunc.Match(r, resp); e != nil {
+			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.RequestURI, e, time.Since(opT))
+		} else if !ok {
 			filiterErr = ErrFuncCheckFail
 			continue
 		}
