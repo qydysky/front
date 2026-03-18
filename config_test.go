@@ -656,8 +656,8 @@ func Test_Uri8(t *testing.T) {
 	if !bytes.Equal(resb, reqb) {
 		t.Fatal(string(resb))
 	}
-	if pass1 || !pass2 {
-		t.Fatal()
+	if !pass1 || !pass2 {
+		t.Fatal(pass1, pass2)
 	}
 }
 
@@ -746,8 +746,8 @@ func Test2(t *testing.T) {
 	if !bytes.Equal(resb, reqb) {
 		t.Fatal(string(resb))
 	}
-	if pass1 || !pass2 {
-		t.Fatal()
+	if !pass1 || !pass2 {
+		t.Fatal(pass1, !pass2)
 	}
 }
 

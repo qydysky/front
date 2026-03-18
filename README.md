@@ -102,7 +102,7 @@ Date: Wed, 30 Oct 2024 17:51:23 GMT
 
 处理流程：
 
-    请求将从上至下尝试route的filiter(reqAddr、reqHost、reqUri、reqHeader)，匹配成功时，再根据route中back的filiter进行过滤，并按rollRule进行排序，然后逐个尝试，若某个back成功响应，则结束本次请求的处理
+    请求将从上至下尝试route的filiter(req*)，匹配成功时，再根据route中back的filiter(req*)进行过滤，并按rollRule进行排序，然后逐个尝试，若某个back成功响应，尝试back的filiter(res*)，尝试route的filiter(res*)，若成功，则结束本次请求的处理
 
 配置：
 
@@ -178,7 +178,7 @@ setting: setting代指下述各配置
             - id:
                 - key: string header头
                 - matchExp: string
-    - resHeader:{} 返回后端的响应前，请求头处理器
+    - resHeader:{} 返回后端的响应前，请求头处理器(仅http、https、ws、wss时有效)
         - accessRule:string 布尔表达式，为true时才通过
         - items: map[string]{}
             - id:

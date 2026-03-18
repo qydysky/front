@@ -118,6 +118,22 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		}
 		break
 	}
+	for filiter := range chosenBack.route.getFiliters() {
+		filiterErr = nil
+		if ok, e := filiter.ResHeader.Match(resp.Header); e != nil {
+			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
+		} else if !ok {
+			filiterErr = ErrHeaderCheckFail
+			continue
+		}
+		if ok, e := filiter.ResFunc.Match(r, resp); e != nil {
+			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))
+		} else if !ok {
+			filiterErr = ErrFuncCheckFail
+			continue
+		}
+		break
+	}
 	if filiterErr != nil {
 		logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, filiterErr, time.Since(opT))
 		return MarkRetry(filiterErr)
