@@ -394,7 +394,6 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	var backLink []*Back
 	var passFiliter *unique.Handle[string]
 	for i := range t.Backs {
-
 		var noPassFiliter bool = passFiliter != nil
 		for filiter := range t.Backs[i].getFiliters() {
 			noPassFiliter = true
@@ -514,6 +513,17 @@ func (t *Route) WR(reqId uint32, routePath string, logger *plog.Log, reqBuf *req
 				}
 				if !noPassFiliter {
 					backIs = addIfNotExsit(backIs, backEqual, backP.(*Back))
+				} else {
+					// 未通过back的filiter，delete cookie
+					cookie := &http.Cookie{
+						Name:   cookie,
+						MaxAge: -1,
+						Path:   routePath,
+					}
+					if utils.ValidCookieDomain(r.Host) {
+						cookie.Domain = r.Host
+					}
+					w.Header().Add("Set-Cookie", (cookie).String())
 				}
 			}
 		}
@@ -755,11 +765,6 @@ func (t *Back) getVerifyPeerCer() (cer []byte, e error) {
 }
 func (t *Back) getFiliters() (f iter.Seq[*filiter.Filiter]) {
 	return func(yield func(*filiter.Filiter) bool) {
-		for i := 0; i < len(t.Filiters); i++ {
-			if !yield(t.Filiters[i]) {
-				return
-			}
-		}
 		for i := 0; i < len(t.route.Filiters); i++ {
 			if !yield(t.route.Filiters[i]) {
 				return
