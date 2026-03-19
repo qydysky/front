@@ -148,7 +148,7 @@ config:
 setting: setting代指下述各配置
 
 - pathAdd: bool 将客户端访问的路径附加在path上 例：/api/req => /ws => /ws/api/req
-- splicing: int 当客户端支持cookie时，将会固定使用后端多少秒，默认不启用
+- splicing: int 当客户端支持cookie时，将会固定使用后端多少秒。固定时back的filiter.reqSplicing若不为true则会忽略，默认不启用
 - ctxToSec: float64 当后端响应超过(ws则指初次返回时间)指定秒，将会errBanSec。由于请求已发送，为避免重复请求，故不重试，响应504
 - errToSec: float64 当得到后端响应时，超过(ws则指初次返回时间)指定秒，将会errBanSec
 - errBanSec: int 当后端错误时（指连接失败，不指后端错误响应），将会禁用若干秒
@@ -160,6 +160,7 @@ setting: setting代指下述各配置
 
     filiters中同个{}为和关系，不同{}为或关系
 
+    - reqSplicing:bool 请求后端前，当splicing启动并匹配时，进行本组filiter匹配
     - reqAddr:{} 请求后端前，请求Addr过滤器
         - accessRule:string 布尔表达式，为true时才通过,例`{id}|(!{id2}&{id3})`
         - items: map[string]string

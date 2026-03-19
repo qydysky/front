@@ -7,6 +7,7 @@ import (
 
 type Filiter struct {
 	id        unique.Handle[string] `json:"-"`
+	ReqSplicing   bool                  `json:"reqSplicing"`
 	ReqBody   Body                  `json:"reqBody"`
 	ReqAddr   Addr                  `json:"reqAddr"`
 	ReqHeader Header                `json:"reqHeader"`
@@ -24,6 +25,7 @@ func (t *Filiter) Id() *unique.Handle[string] {
 func (t *Filiter) UnmarshalJSON(b []byte) error {
 	var s = struct {
 		id        unique.Handle[string] `json:"-"`
+	ReqSplicing   bool                  `json:"reqSplicing"`
 		ReqBody   Body                  `json:"reqBody"`
 		ReqAddr   Addr                  `json:"reqAddr"`
 		ReqHeader Header                `json:"reqHeader"`

@@ -490,28 +490,33 @@ func (t *Route) WR(reqId uint32, routePath string, logger *plog.Log, reqBuf *req
 	{
 		if val, e := r.Cookie(cookie); e == nil {
 			if backP, aok := t.backMap.Load(val.Value); aok {
-				var noPassFiliter bool
+				var passFiliter = true
 				for filiter := range backP.(*Back).getFiliters() {
-					noPassFiliter = true
-					if ok, e := filiter.ReqAddr.Match(r); !ok || e != nil {
+					if !filiter.ReqSplicing {
 						continue
+					}
+					if ok, e := filiter.ReqAddr.Match(r); !ok || e != nil {
+						passFiliter = false
+						break
 					}
 					if ok, e := filiter.ReqHost.Match(r); !ok || e != nil {
-						continue
+						passFiliter = false
+						break
 					}
 					if ok, e := filiter.ReqUri.Match(r); !ok || e != nil {
-						continue
+						passFiliter = false
+						break
 					}
 					if ok, e := filiter.ReqHeader.Match(r.Header); !ok || e != nil {
-						continue
+						passFiliter = false
+						break
 					}
 					if ok, e := filiter.ReqFunc.Match(r); !ok || e != nil {
-						continue
+						passFiliter = false
+						break
 					}
-					noPassFiliter = false
-					break
 				}
-				if !noPassFiliter {
+				if passFiliter {
 					backIs = addIfNotExsit(backIs, backEqual, backP.(*Back))
 				}
 			}
