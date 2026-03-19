@@ -160,7 +160,7 @@ setting: setting代指下述各配置
 
     filiters中同个{}为和关系，不同{}为或关系
 
-    - reqSplicing:bool 请求后端前，当splicing启动并匹配时，进行本组filiter匹配
+    - reqSplicing:bool 当splicing启动并匹配时，进行本组filiter匹配，其他情况不进行本组匹配
     - reqAddr:{} 请求后端前，请求Addr过滤器
         - accessRule:string 布尔表达式，为true时才通过,例`{id}|(!{id2}&{id3})`
         - items: map[string]string

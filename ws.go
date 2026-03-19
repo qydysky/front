@@ -103,6 +103,9 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 
 	var filiterErr error
 	for filiter := range chosenBack.getFiliters() {
+		if filiter.ReqSplicing {
+			continue
+		}
 		filiterErr = nil
 		if ok, e := filiter.ResHeader.Match(resp.Header); e != nil {
 			logger.WF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.Name, e, time.Since(opT))

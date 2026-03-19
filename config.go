@@ -396,6 +396,9 @@ func (t *Route) FiliterBackByRequest(r *http.Request) []*Back {
 	for i := range t.Backs {
 		var noPassFiliter bool = passFiliter != nil
 		for filiter := range t.Backs[i].getFiliters() {
+			if t.Filiters[i].ReqSplicing {
+				continue
+			}
 			noPassFiliter = true
 			if passFiliter != nil && filiter.Id() != passFiliter {
 				continue
