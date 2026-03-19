@@ -146,7 +146,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		defer chosenBack.ed()
 	}
 
-	chosenBack.SetSplicing(w, r, routePath)
+	chosenBack.SplicingReq(w, r, routePath)
 
 	defer conn.Close()
 

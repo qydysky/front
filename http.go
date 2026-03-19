@@ -193,7 +193,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		defer chosenBack.ed()
 	}
 
-	chosenBack.SetSplicing(w, r, routePath)
+	chosenBack.SplicingReq(w, r, routePath)
 
 	// w.Header().Add(header+"Info", chosenBack.Name)
 

@@ -58,7 +58,7 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 
 	logger.TF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT))
 
-	chosenBack.SetSplicing(w, r, routePath)
+	chosenBack.SplicingReq(w, r, routePath)
 
 	setEnvIfNot(env, `$remote_addr`, r.Header.Get("X-Real-IP"))
 	setEnvIfNot(env, `$remote_addr`, strings.Split(r.RemoteAddr, ":")[0])

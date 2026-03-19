@@ -513,17 +513,6 @@ func (t *Route) WR(reqId uint32, routePath string, logger *plog.Log, reqBuf *req
 				}
 				if !noPassFiliter {
 					backIs = addIfNotExsit(backIs, backEqual, backP.(*Back))
-				} else {
-					// 未通过back的filiter，delete cookie
-					cookie := &http.Cookie{
-						Name:   cookie,
-						MaxAge: -1,
-						Path:   routePath,
-					}
-					if utils.ValidCookieDomain(r.Host) {
-						cookie.Domain = r.Host
-					}
-					w.Header().Add("Set-Cookie", (cookie).String())
 				}
 			}
 		}
@@ -727,12 +716,6 @@ func (t *Back) getProxy() string {
 	}
 	return t.Proxy
 }
-func (t *Back) getSplicing() int {
-	if t.Splicing == 0 {
-		return t.route.Splicing
-	}
-	return t.Splicing
-}
 func (t *Back) getPathAdd() bool {
 	return t.route.PathAdd || t.PathAdd
 }
@@ -845,7 +828,13 @@ func (t *Back) getDealerResStatus(yieldNoBreak ...func()) iter.Seq[dealer.Status
 		}
 	}
 }
-func (t *Back) SetSplicing(w http.ResponseWriter, r *http.Request, routePath string) {
+func (t *Back) getSplicing() int {
+	if t.Splicing == 0 {
+		return t.route.Splicing
+	}
+	return t.Splicing
+}
+func (t *Back) SplicingReq(w http.ResponseWriter, r *http.Request, routePath string) {
 	if t.getSplicing() != 0 {
 		cookie := &http.Cookie{
 			Name:   cookie,

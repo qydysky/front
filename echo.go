@@ -36,7 +36,7 @@ func (echoDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 
 	logger.TF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT))
 
-	chosenBack.SetSplicing(w, r, routePath)
+	chosenBack.SplicingReq(w, r, routePath)
 
 	// w.Header().Add(header+"Info", chosenBack.Name)
 
