@@ -146,20 +146,7 @@ func (wsDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter, r
 		defer chosenBack.ed()
 	}
 
-	if chosenBack.getSplicing() != 0 {
-		cookie := &http.Cookie{
-			Name:   cookie,
-			Value:  chosenBack.Id(),
-			MaxAge: chosenBack.getSplicing(),
-			Path:   routePath,
-		}
-		if utils.ValidCookieDomain(r.Host) {
-			cookie.Domain = r.Host
-		}
-		w.Header().Set("Set-Cookie", (cookie).String())
-	}
-
-	// w.Header().Set(header+"Info", cookie+";"+chosenBack.Name)
+	chosenBack.SetSplicing(w, r, routePath)
 
 	defer conn.Close()
 

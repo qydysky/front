@@ -772,36 +772,6 @@ func (t *Back) getFiliters() (f iter.Seq[*filiter.Filiter]) {
 		}
 	}
 }
-
-// func (t *Back) getFiliterReqHeader() *filiter.Header {
-// 	if !t.Filiter.ReqHeader.Valid() {
-// 		return &t.route.Filiter.ReqHeader
-// 	} else {
-// 		return &t.Filiter.ReqHeader
-// 	}
-// }
-// func (t *Back) getFiliterReqUri() *filiter.Uri {
-// 	if !t.Filiter.ReqUri.Valid() {
-// 		return &t.route.Filiter.ReqUri
-// 	} else {
-// 		return &t.Filiter.ReqUri
-// 	}
-// }
-// func (t *Back) getFiliterResHeader() *filiter.Header {
-// 	if !t.Filiter.ResHeader.Valid() {
-// 		return &t.route.Filiter.ResHeader
-// 	} else {
-// 		return &t.Filiter.ResHeader
-// 	}
-// }
-
-//	func (t *Back) getFiliterResBody() *filiter.Body {
-//		if !t.Filiter.ReqBody.Valid() {
-//			return &t.route.Filiter.ReqBody
-//		} else {
-//			return &t.Filiter.ReqBody
-//		}
-//	}
 func (t *Back) getDealerReqUri() iter.Seq[dealer.UriDealer] {
 	return func(yield func(dealer.UriDealer) bool) {
 		for i := 0; i < len(t.Dealer.ReqUri); i++ {
@@ -844,36 +814,6 @@ func (t *Back) getDealerResHeader() iter.Seq[dealer.HeaderDealer] {
 		}
 	}
 }
-
-//	func (t *Back) getDealerReqFunc() iter.Seq[dealer.ReqFunc] {
-//		return func(yield func(dealer.ReqFunc) bool) {
-//			if t.Dealer.ReqFunc.Dealer != nil {
-//				if !yield(t.Dealer.ReqFunc) {
-//					return
-//				}
-//			}
-//			if t.route.Dealer.ReqFunc.Dealer != nil {
-//				if !yield(t.route.Dealer.ReqFunc) {
-//					return
-//				}
-//			}
-//		}
-//	}
-//
-//	func (t *Back) getDealerResFunc() iter.Seq[dealer.ResFunc] {
-//		return func(yield func(dealer.ResFunc) bool) {
-//			if t.Dealer.ResFunc.Dealer != nil {
-//				if !yield(t.Dealer.ResFunc) {
-//					return
-//				}
-//			}
-//			if t.route.Dealer.ResFunc.Dealer != nil {
-//				if !yield(t.route.Dealer.ResFunc) {
-//					return
-//				}
-//			}
-//		}
-//	}
 func (t *Back) getDealerResBody() iter.Seq[dealer.Body] {
 	return func(yield func(dealer.Body) bool) {
 		for i := 0; i < len(t.Dealer.ResBody); i++ {
@@ -905,7 +845,20 @@ func (t *Back) getDealerResStatus(yieldNoBreak ...func()) iter.Seq[dealer.Status
 		}
 	}
 }
-
+func (t *Back) SetSplicing(w http.ResponseWriter, r *http.Request, routePath string) {
+	if t.getSplicing() != 0 {
+		cookie := &http.Cookie{
+			Name:   cookie,
+			Value:  t.Id(),
+			MaxAge: t.getSplicing(),
+			Path:   routePath,
+		}
+		if utils.ValidCookieDomain(r.Host) {
+			cookie.Domain = r.Host
+		}
+		w.Header().Add("Set-Cookie", (cookie).String())
+	}
+}
 func (t *Back) Id() string {
 	return fmt.Sprintf("%p", t)
 }

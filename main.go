@@ -141,8 +141,7 @@ func setEnvIfNot(m map[string]string, key, val string) {
 	}
 }
 
-// var header = "X-Front-"
-var cookie = fmt.Sprintf("_psign_%p_%s", &struct{}{}, time.Now().Format("20060102150405"))
+var cookie = "front_sign"
 var (
 	ErrRedirect          = errors.New("ErrRedirect")
 	ErrNoHttp            = errors.New("ErrNoHttp")

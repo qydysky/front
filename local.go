@@ -11,7 +11,6 @@ import (
 	"time"
 	_ "unsafe"
 
-	"github.com/qydysky/front/utils"
 	component2 "github.com/qydysky/part/component2"
 	pfile "github.com/qydysky/part/file"
 	plog "github.com/qydysky/part/log/v2"
@@ -59,20 +58,7 @@ func (localDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter
 
 	logger.TF(logFormat, reqId, r.RemoteAddr, chosenBack.route.config.Addr, routePath, chosenBack.route.Name, chosenBack.Name, r.Method, r.RequestURI, time.Since(opT))
 
-	if chosenBack.getSplicing() != 0 {
-		cookie := &http.Cookie{
-			Name:   cookie,
-			Value:  chosenBack.Id(),
-			MaxAge: chosenBack.getSplicing(),
-			Path:   routePath,
-		}
-		if utils.ValidCookieDomain(r.Host) {
-			cookie.Domain = r.Host
-		}
-		w.Header().Add("Set-Cookie", (cookie).String())
-	}
-
-	// w.Header().Add(header+"Info", chosenBack.Name)
+	chosenBack.SetSplicing(w, r, routePath)
 
 	setEnvIfNot(env, `$remote_addr`, r.Header.Get("X-Real-IP"))
 	setEnvIfNot(env, `$remote_addr`, strings.Split(r.RemoteAddr, ":")[0])

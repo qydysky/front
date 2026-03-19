@@ -17,7 +17,6 @@ import (
 	gzip "compress/gzip"
 
 	br "github.com/qydysky/brotli"
-	"github.com/qydysky/front/utils"
 	component2 "github.com/qydysky/part/component2"
 	pctx "github.com/qydysky/part/ctx"
 	pio "github.com/qydysky/part/io"
@@ -194,18 +193,7 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		defer chosenBack.ed()
 	}
 
-	if chosenBack.getSplicing() != 0 {
-		cookie := &http.Cookie{
-			Name:   cookie,
-			Value:  chosenBack.Id(),
-			MaxAge: chosenBack.getSplicing(),
-			Path:   routePath,
-		}
-		if utils.ValidCookieDomain(r.Host) {
-			cookie.Domain = r.Host
-		}
-		w.Header().Add("Set-Cookie", (cookie).String())
-	}
+	chosenBack.SetSplicing(w, r, routePath)
 
 	// w.Header().Add(header+"Info", chosenBack.Name)
 
