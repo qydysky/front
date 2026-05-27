@@ -42,9 +42,10 @@ var ErrDuplicatePath = errors.New(`ErrDuplicatePath`)
 type Config struct {
 	Addr string `json:"addr"`
 	TLS  struct {
-		Pub     string   `json:"pub,omitempty"`
-		Key     string   `json:"key,omitempty"`
-		Decrypt []string `json:"decrypt,omitempty"`
+		Pub     string           `json:"pub,omitempty"`
+		Key     string           `json:"key,omitempty"`
+		Decrypt []string         `json:"decrypt,omitempty"`
+		cert    *tls.Certificate `json:"-"`
 	} `json:"tls"`
 	RetryBlocks  Blocks                      `json:"retryBlocks"`
 	RetryBlocksI pool.BlocksI[byte]          `json:"-"`
@@ -138,12 +139,14 @@ func (t *Config) Run(rootCtx context.Context, logger *plog.Log) {
 		} else if cert, e := tls.X509KeyPair(pub, pri); e != nil {
 			logger.EF("%v %v", t.Addr, e)
 		} else {
+			t.TLS.cert = &cert
+		}
+		if t.TLS.cert != nil {
 			httpSer.TLSConfig = &tls.Config{
-				Certificates: []tls.Certificate{cert},
+				Certificates: []tls.Certificate{*t.TLS.cert},
 				NextProtos:   []string{"h2", "http/1.1"},
 			}
 		}
-
 	}
 	if t.ReqIdLoop <= 0 {
 		t.ReqIdLoop = 1000
