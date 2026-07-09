@@ -91,6 +91,8 @@ func (httpDealer) Deal(ctx context.Context, reqId uint32, w http.ResponseWriter,
 		client.Transport.(*http.Transport).Proxy = func(_ *http.Request) (*netUrl.URL, error) {
 			return netUrl.Parse(chosenBack.getProxy())
 		}
+	} else {
+		client.Transport.(*http.Transport).Proxy = nil
 	}
 
 	if cer, err := chosenBack.getVerifyPeerCer(); err == nil {
