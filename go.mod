@@ -1,21 +1,21 @@
 module github.com/qydysky/front
 
-go 1.26
+go 1.27
 
 require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/qydysky/brotli v0.0.0-20250531004300-54adcf96cc4a
-	github.com/qydysky/part v0.28.20260623155308
+	github.com/qydysky/part v0.28.20261021122203
 	golang.org/x/net v0.47.0
+	modernc.org/sqlite v1.40.1
 )
-
-require github.com/klauspost/compress v1.18.2 // indirect
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/klauspost/compress v1.18.7 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -32,7 +32,6 @@ require (
 	modernc.org/libc v1.67.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.40.1
 )
 
 // replace github.com/qydysky/part => ../part
